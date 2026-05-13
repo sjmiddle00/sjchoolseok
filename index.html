@@ -192,9 +192,24 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .excel-preview-row.dup{opacity:.4;}
 .excel-preview-row .pr-name{font-weight:600;}.excel-preview-row .pr-grade{color:var(--muted);}
 .excel-upload-btn{width:100%;padding:13px;font-size:15px;font-weight:700;background:var(--pr);color:#fff;border:none;border-radius:var(--r);cursor:pointer;display:none;}
-.stu-item{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--card);border-radius:var(--r);margin-bottom:7px;box-shadow:0 1px 5px rgba(0,0,0,.06);}
+.stu-ctrl-bar{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+.stu-search-inp{flex:1;min-width:120px;padding:11px 12px;font-size:14px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7;color:var(--txt);}
+.stu-search-inp:focus{outline:none;border-color:var(--pr);background:#fff;}
+.stu-grade-filter{width:105px;min-width:80px;flex-shrink:1;padding:11px 8px;font-size:14px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7;color:var(--txt);appearance:none;cursor:pointer;}
+.stu-grade-filter:focus{outline:none;border-color:var(--pr);}
+.stu-bulk-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f7f7f7;border-radius:var(--r);margin-bottom:8px;}
+.stu-all-wrap{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--txt);-webkit-user-select:none;}
+.stu-all-wrap input{width:18px;height:18px;cursor:pointer;accent-color:var(--pr);flex-shrink:0;}
+.stu-del-sel{padding:7px 14px;background:var(--rd-bg);color:var(--rd-fg);border:none;border-radius:var(--r);font-size:13px;font-weight:700;cursor:pointer;}
+.stu-del-sel:not(:disabled):active{opacity:.8;}
+.stu-del-sel:disabled{opacity:.35;cursor:not-allowed;}
+.stu-item{display:flex;align-items:center;padding:12px 14px;background:var(--card);border-radius:var(--r);margin-bottom:7px;box-shadow:0 1px 5px rgba(0,0,0,.06);cursor:pointer;transition:background .12s;-webkit-user-select:none;}
+.stu-item.sel{background:var(--pr-pl);}
+.stu-item-left{display:flex;align-items:center;gap:12px;flex:1;}
+.stu-cb{width:18px;height:18px;cursor:pointer;accent-color:var(--pr);flex-shrink:0;pointer-events:none;}
 .stu-name{font-size:15px;font-weight:600;}
 .stu-grade{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--pr-pl);color:var(--pr-dk);display:inline-block;margin-top:3px;}
+.stu-item.sel .stu-grade{background:rgba(125,60,152,.2);}
 .del-btn{background:var(--rd-bg);color:var(--rd-fg);border:none;width:32px;height:32px;border-radius:50%;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .sett-row{margin-bottom:14px;}
 .sett-lbl{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px;}
@@ -389,6 +404,29 @@ select, input, button { min-width: 0; box-sizing: border-box; }
 
   <div class="adm-sec">
     <div class="adm-sec-ttl">등록된 학생 <span id="stu-count" style="font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+
+    <!-- 검색 + 학년 필터 -->
+    <div class="stu-ctrl-bar">
+      <input class="stu-search-inp" id="stu-search" type="text"
+             placeholder="🔍 이름 검색..." oninput="onStuSearch()"/>
+      <select class="stu-grade-filter" id="stu-filter-grade"
+              style="display:none" onchange="onStuFilterGrade()">
+        <option value="">전체 학년</option>
+      </select>
+    </div>
+
+    <!-- 전체 선택 + 선택 삭제 -->
+    <div class="stu-bulk-bar">
+      <label class="stu-all-wrap">
+        <input type="checkbox" id="stu-select-all" onchange="toggleSelectAll(this)"/>
+        <span id="stu-all-label">전체 선택</span>
+      </label>
+      <button class="stu-del-sel" id="stu-del-btn"
+              onclick="bulkDeleteStudents()" disabled>
+        선택 삭제 (0명)
+      </button>
+    </div>
+
     <div id="stu-list"></div>
   </div>
 
@@ -512,6 +550,9 @@ let remoteSettings = {};
 let students       = [];
 let selStatus      = null;
 let parsedXlsx     = [];
+let stuSearchQuery = '';
+let stuFilterGrade = '';
+let selectedStuKeys= new Set();
 let refreshTimer   = null;
 let timeTimer      = null;
 
@@ -974,6 +1015,125 @@ async function addStudent(){
   }catch(e){showToast('연결 오류: '+e.message);}
   finally{setLoading(false);}
 }
+// ── 학생 관리 (검색·필터·일괄 선택 삭제) ────────────────────
+
+function getFilteredStudents(){
+  return koreanSort(students).filter(s=>{
+    const matchName  = !stuSearchQuery || s.name.includes(stuSearchQuery);
+    const matchGrade = !stuFilterGrade  || s.grade === stuFilterGrade;
+    return matchName && matchGrade;
+  });
+}
+
+function toggleStuSelect(key){
+  if(selectedStuKeys.has(key)) selectedStuKeys.delete(key);
+  else selectedStuKeys.add(key);
+  document.querySelectorAll('.stu-item').forEach(el=>{
+    if(el.dataset.key===key){
+      const on=selectedStuKeys.has(key);
+      el.classList.toggle('sel',on);
+      const cb=el.querySelector('.stu-cb'); if(cb) cb.checked=on;
+    }
+  });
+  updateBulkDeleteBtn(); updateSelectAllState();
+}
+
+function toggleSelectAll(cb){
+  getFilteredStudents().forEach(s=>{
+    const key=s.name+'__'+s.grade;
+    if(cb.checked) selectedStuKeys.add(key);
+    else           selectedStuKeys.delete(key);
+  });
+  renderStudentList();
+}
+
+function updateSelectAllState(){
+  const filtered=getFilteredStudents();
+  const cb=document.getElementById('stu-select-all');
+  const lbl=document.getElementById('stu-all-label');
+  if(!cb) return;
+  const selCount=filtered.filter(s=>selectedStuKeys.has(s.name+'__'+s.grade)).length;
+  if(!filtered.length||selCount===0){cb.checked=false;cb.indeterminate=false;}
+  else if(selCount===filtered.length){cb.checked=true;cb.indeterminate=false;}
+  else{cb.checked=false;cb.indeterminate=true;}
+  lbl.textContent=filtered.length?`전체 선택 (${filtered.length}명)`:'전체 선택';
+}
+
+function updateBulkDeleteBtn(){
+  const btn=document.getElementById('stu-del-btn'); if(!btn) return;
+  const n=selectedStuKeys.size;
+  btn.textContent=`선택 삭제 (${n}명)`; btn.disabled=n===0;
+}
+
+function onStuSearch(){
+  stuSearchQuery=document.getElementById('stu-search').value.trim();
+  selectedStuKeys.clear(); renderStudentList();
+}
+function onStuFilterGrade(){
+  stuFilterGrade=document.getElementById('stu-filter-grade').value;
+  selectedStuKeys.clear(); renderStudentList();
+}
+
+function renderStudentList(){
+  const el=document.getElementById('stu-list');
+  document.getElementById('stu-count').textContent=`(${students.length}명)`;
+  const filtered=getFilteredStudents();
+  if(!filtered.length){
+    el.innerHTML='<div class="empty-msg" style="background:#fff;border-radius:10px;padding:20px">'+(students.length?'검색 결과가 없습니다':'등록된 학생이 없습니다')+'</div>';
+    updateBulkDeleteBtn(); updateSelectAllState(); return;
+  }
+  el.innerHTML=filtered.map(s=>{
+    const key=s.name+'__'+s.grade; const on=selectedStuKeys.has(key);
+    return `<div class="stu-item${on?' sel':''}" data-key="${esc(key)}"
+              onclick="toggleStuSelect(this.dataset.key)">
+      <div class="stu-item-left">
+        <input type="checkbox" class="stu-cb" ${on?'checked':''}
+               onclick="event.stopPropagation();toggleStuSelect(this.closest('.stu-item').dataset.key)"/>
+        <div>
+          <div class="stu-name">${esc(s.name)}</div>
+          <span class="stu-grade">${isDeptYearType()?(s.grade+'년생'):esc(s.grade)}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  updateBulkDeleteBtn(); updateSelectAllState();
+}
+
+async function bulkDeleteStudents(){
+  if(selectedStuKeys.size===0) return;
+  if(!confirm(`선택한 ${selectedStuKeys.size}명을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  const toDelete=[...selectedStuKeys].map(key=>{
+    const idx=key.indexOf('__');
+    return {name:key.slice(0,idx), grade:key.slice(idx+2)};
+  });
+  setLoading(true,`${toDelete.length}명 삭제 중...`);
+  try{
+    const data=await api({action:'bulkRemoveStudents',students:JSON.stringify(toDelete)});
+    if(data.error&&data.error.includes('알 수 없는')){await sequentialDelete(toDelete);return;}
+    if(data.error){showToast('오류: '+data.error);return;}
+    students=data.students||[]; resetStuFilter(); renderStudentList(); buildGradeFilter();
+    showToast(`${toDelete.length}명 삭제 완료`);
+  }catch(e){await sequentialDelete(toDelete);}
+  finally{setLoading(false);}
+}
+
+async function sequentialDelete(list){
+  let done=0;
+  for(const s of list){
+    setLoading(true,`${done+1}/${list.length}명 삭제 중...`);
+    try{await api({action:'removeStudent',name:s.name,grade:s.grade});done++;}catch(e){}
+  }
+  try{const data=await api({action:'students'});students=data.students||[];}catch(e){}
+  resetStuFilter(); renderStudentList(); buildGradeFilter();
+  showToast(`${done}명 삭제 완료`); setLoading(false);
+}
+
+function resetStuFilter(){
+  stuSearchQuery=''; stuFilterGrade=''; selectedStuKeys.clear();
+  const si=document.getElementById('stu-search'); if(si) si.value='';
+  const gf=document.getElementById('stu-filter-grade'); if(gf) gf.value='';
+}
+
 async function removeStudent(name,grade){
   if(!confirm(`"${name}" 학생을 삭제하시겠습니까?`)) return;
   setLoading(true,'삭제 중...');
@@ -984,21 +1144,6 @@ async function removeStudent(name,grade){
     showToast(`${name} 삭제됨`);
   }catch(e){showToast('연결 오류: '+e.message);}
   finally{setLoading(false);}
-}
-function renderStudentList(){
-  const el=document.getElementById('stu-list');
-  document.getElementById('stu-count').textContent=`(${students.length}명)`;
-  if(!students.length){el.innerHTML='<div class="empty-msg" style="background:#fff;border-radius:10px;padding:20px">등록된 학생이 없습니다</div>';return;}
-  // ★ 관리자 목록도 가나다 정렬
-  const sorted = koreanSort(students);
-  el.innerHTML=sorted.map(s=>`
-    <div class="stu-item">
-      <div>
-        <div class="stu-name">${esc(s.name)}</div>
-        <span class="stu-grade">${isDeptYearType() ? (s.grade+'년생') : esc(s.grade)}</span>
-      </div>
-      <button class="del-btn" onclick="removeStudent('${esc(s.name)}','${esc(s.grade)}')">✕</button>
-    </div>`).join('');
 }
 
 // ── 엑셀 ─────────────────────────────────────────────────────
@@ -1117,11 +1262,22 @@ function goAdmin(){
     const sel = document.getElementById('new-grade');
     sel.innerHTML = '<option value="">학년 선택</option>';
     grades.forEach(g => {
-      const o = document.createElement('option');
-      o.value = g; o.textContent = g;
-      sel.appendChild(o);
+      const o = document.createElement('option'); o.value = g; o.textContent = g; sel.appendChild(o);
     });
+
+    // ★ 학생 목록 학년 필터도 세팅
+    const gf = document.getElementById('stu-filter-grade');
+    gf.style.display = '';
+    gf.innerHTML = '<option value="">전체 학년</option>';
+    grades.forEach(g => {
+      const o = document.createElement('option'); o.value = g; o.textContent = g; gf.appendChild(o);
+    });
+  } else {
+    document.getElementById('stu-filter-grade').style.display = 'none';
   }
+
+  // ★ 검색/필터/선택 초기화
+  resetStuFilter();
 
   // ★ 엑셀 설명 문구 변경
   const desc = document.getElementById('excel-desc');
