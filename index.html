@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>서부제일 교육부 출석체크</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<!--
+╔══════════════════════════════════════════════════════════════╗
+║  ★ 관리자 필수 설정 ★                                        ║
+║  각 부서의 이름과 GAS 배포 URL을 아래에 입력하세요.             ║
+║  URL은 부서마다 별도로 만든 Apps Script 배포 주소입니다.         ║
+╚══════════════════════════════════════════════════════════════╝
+-->
+<script>
+const DEPARTMENTS = [
+  { name: '영유아부', emoji: '🍼', url: 'https://script.google.com/macros/s/AKfycbzo9rqI6oTzc5uD14farTkALhXMTUhO_YZOBwyq8-ujAs-4RqLRjj7hgJOgII6vPWF3/exec', type: 'year' },
+  { name: '유치부',  emoji: '🌱', url: 'https://script.google.com/macros/s/AKfycbwFYpoX1UpAvdL_3ioC-ufIf-y3wsLoXCv0E8OTY7xGvngE_PZeSKa46rVzMc2LKASLAg/exec',  type: 'year' },
+  { name: '유년부',  emoji: '🎨', url: 'https://script.google.com/macros/s/AKfycbwZ91gomOxygMzIE3_n5CDTUuwQ9OUY-zkz4KAxxprqxjeASHFm7n3eY3k5JsQo7qrfOg/exec' },
+  { name: '소년부',  emoji: '⚽', url: 'https://script.google.com/macros/s/AKfycbyplIR2TyvEeaj9K40poXij-Hiyz6YymAJx7ywwFAq-jJBghZLouz3bB6eNI912EKI17A/exec' },
+  { name: '중등부',  emoji: '✏️', url: 'https://script.google.com/macros/s/AKfycbzoM5nnStnaeL5zuQljj6dURnE3z3j_R_MywXGAqwBNKz-8AQrUxRy3oZxbTTbjgPxr/exec' },
+  { name: '고등부',  emoji: '🎒', url: 'https://script.google.com/macros/s/AKfycbzUnxJqAstX3Ilow3Rs16DL1dw_WnrIESeOMtWdfn6FHCdPyDMqDYCVA9foL0QeLtwV/exec' },
+  { name: '청년부',  emoji: '🌟', url: 'https://script.google.com/macros/s/AKfycbxjv0eEj81GFz1kYpOdPI0oMLBnEShR2shTN1I8OrpkpEd6c5JEz277JzyDh0FRHdF5/exec',  type: 'year' },
+  { name: '영어예배부', emoji: '🌍', url: 'https://script.google.com/macros/s/AKfycbxaDXp0ylXb27yv7waPrMOINIvuLTUxp5kNJ7Nve_lbwjSAmdg-0wRQrP1HGgwaRSvrnw/exec', type: 'year' },
+];
+
+// 부서 선택 화면 관리자 비밀번호 (부서 활성화/비활성화 용)
+// ★ 배포 전 원하는 비밀번호로 변경하세요
+const DEPT_ADMIN_PW = '0691';
+
+// ★ 부서별 학년 목록 (학년제 부서만 해당)
+const DEPT_GRADES = {
+  '유년부': ['초1', '초2', '초3'],
+  '소년부': ['초4', '초5', '초6'],
+  '중등부': ['중1', '중2', '중3'],
+  '고등부': ['고1', '고2', '고3'],
+};
+</script>
+
+<style>
+:root {
+  --pr:#7D3C98; --pr-dk:#5B2C6F; --pr-pl:#F5EEF8;
+  --gr-bg:#D5F5E3; --gr-fg:#1A7A41;
+  --or-bg:#FDEBD0; --or-fg:#B7770D;
+  --rd-bg:#FDEDEC; --rd-fg:#C0392B;
+  --bl-bg:#EAF4FB; --bl-fg:#1A5276;
+  --bg:#f0ebf5; --card:#fff; --txt:#1a1a1a; --muted:#7f8c8d; --bdr:rgba(0,0,0,.09);
+  --R:16px; --r:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:-apple-system,'Apple SD Gothic Neo',sans-serif;background:var(--bg);min-height:100vh;padding-bottom:70px;}
+.screen{display:none;}.screen.active{display:block;}
+
+/* ── 부서 선택 화면 ────────────────────────────────────────── */
+.dept-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px;}
+.dept-top{text-align:center;margin-bottom:32px;}
+.dept-top .cross{font-size:44px;margin-bottom:12px;}
+.dept-top h1{font-size:26px;font-weight:700;color:var(--pr-dk);margin-bottom:6px;}
+.dept-top p{font-size:14px;color:var(--muted);line-height:1.6;}
+.dept-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:400px;}
+.dept-btn{position:relative;padding:24px 12px 20px;background:var(--card);border:2px solid var(--bdr);border-radius:var(--R);cursor:pointer;text-align:center;transition:all .15s;box-shadow:0 2px 12px rgba(0,0,0,.06);}
+.dept-btn:active{transform:scale(.96);}
+.dept-btn .d-emoji{font-size:30px;display:block;margin-bottom:8px;}
+.dept-btn .d-name{font-size:16px;font-weight:700;color:var(--txt);}
+.dept-btn.active-dept{border-color:var(--pr);background:var(--pr-pl);}
+.dept-btn.active-dept .d-name{color:var(--pr-dk);}
+.dept-btn.active-dept::after{content:'✓';position:absolute;top:8px;right:10px;font-size:13px;font-weight:700;color:var(--pr);}
+.dept-btn.dept-disabled{opacity:.32;cursor:not-allowed;filter:grayscale(.6);}
+.dept-btn.dept-disabled .d-name{color:var(--muted);}
+.dept-btn.dept-disabled::before{content:'비활성';position:absolute;top:7px;left:10px;font-size:10px;font-weight:700;color:var(--muted);background:#f0f0f0;padding:1px 6px;border-radius:8px;}
+
+/* 부서선택 하단 관리자 버튼 */
+.dept-admin-link{margin-top:22px;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:8px 16px;border-radius:20px;opacity:.6;}
+.dept-admin-link:active{opacity:1;}
+
+/* 부서 관리 오버레이 */
+.dept-admin-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.54);z-index:200;align-items:flex-end;justify-content:center;}
+.dept-admin-overlay.show{display:flex;}
+.dept-admin-sheet{background:#fff;border-radius:var(--R) var(--R) 0 0;padding:0 0 40px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;}
+.dept-admin-drag{width:40px;height:4px;background:#ddd;border-radius:4px;margin:12px auto 0;}
+.dept-admin-title{padding:16px 20px 12px;font-size:17px;font-weight:700;border-bottom:1px solid var(--bdr);}
+.dept-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #f5f5f5;}
+.dept-toggle-row:last-child{border-bottom:none;}
+.dt-left{display:flex;align-items:center;gap:12px;}
+.dt-emoji{font-size:22px;}
+.dt-name{font-size:16px;font-weight:600;color:var(--txt);}
+.dt-status{font-size:11px;margin-top:2px;}
+.dt-status.on{color:var(--gr-fg);}.dt-status.off{color:var(--rd-fg);}
+
+/* 토글 스위치 */
+.toggle-wrap{position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0;}
+.toggle-wrap input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:28px;transition:.25s;}
+.toggle-slider::before{content:'';position:absolute;height:22px;width:22px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.25s;box-shadow:0 1px 4px rgba(0,0,0,.2);}
+input:checked+.toggle-slider{background:var(--pr);}
+input:checked+.toggle-slider::before{transform:translateX(22px);}
+
+.dept-admin-save{width:calc(100% - 40px);margin:16px 20px 0;padding:14px;background:var(--pr);color:#fff;border:none;border-radius:var(--r);font-size:16px;font-weight:700;cursor:pointer;}
+
+/* ── 헤더 ──────────────────────────────────────────────────── */
+.hdr{background:var(--pr-dk);color:#fff;padding:52px 18px 18px;position:relative;text-align:center;}
+.hdr .dept-tag{display:inline-block;background:rgba(255,255,255,.20);border-radius:20px;padding:2px 12px;font-size:12px;font-weight:600;margin-bottom:4px;}
+.hdr h1{font-size:21px;font-weight:700;letter-spacing:-.5px;}
+.hdr .dt{font-size:13px;margin-top:4px;opacity:.85;}
+
+/* ★ 예배 시간 상태 뱃지 */
+.time-badge{display:inline-flex;align-items:center;gap:5px;margin-top:7px;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;transition:all .3s;}
+.time-badge.present{background:rgba(30,180,100,.30);color:#b8ffd6;}
+.time-badge.late{background:rgba(220,130,30,.35);color:#ffd9a0;}
+.time-badge.none{background:rgba(255,255,255,.12);color:rgba(255,255,255,.75);font-weight:400;}
+
+.icon-btn{position:absolute;top:52px;background:rgba(255,255,255,.15);border:none;color:#fff;width:38px;height:38px;border-radius:50%;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.icon-btn.left{left:16px;}.icon-btn.right{right:16px;}
+
+/* ── 카드 ──────────────────────────────────────────────────── */
+.card{background:var(--card);border-radius:var(--R);margin:12px 14px 0;padding:18px;box-shadow:0 2px 14px rgba(0,0,0,.07);}
+.lbl{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.7px;text-transform:uppercase;margin-bottom:10px;}
+.sel-row{display:flex;gap:8px;}
+.sel-row select{padding:14px 32px 14px 12px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237D3C98' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;appearance:none;color:var(--txt);cursor:pointer;}
+.sel-row select:focus{outline:none;border-color:var(--pr);background-color:#fff;}
+#grade-sel{width:108px;flex-shrink:0;}#name-sel{flex:1;}
+
+/* ── ★ 출석 확인 버튼 (단일) ───────────────────────────────── */
+.single-btn{width:100%;padding:26px 20px;font-size:20px;font-weight:700;border:none;border-radius:var(--R);cursor:pointer;transition:all .15s;letter-spacing:-.3px;text-align:center;}
+.single-btn .sb-icon{font-size:34px;display:block;margin-bottom:10px;}
+.single-btn .sb-sub{font-size:12px;font-weight:400;margin-top:4px;opacity:.75;}
+.single-btn.on{background:var(--pr);color:#fff;box-shadow:0 6px 24px rgba(125,60,152,.35);}
+.single-btn.on:active{transform:scale(.97);}
+.single-btn.off{background:#e8dff2;color:#b0a0c0;cursor:not-allowed;}
+
+/* ── ★ 출석/지각 버튼 ──────────────────────────────────────── */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.stat-btn{position:relative;padding:22px 10px;border:2px solid var(--bdr);border-radius:var(--R);background:#f7f7f7;cursor:pointer;text-align:center;transition:all .14s;-webkit-user-select:none;}
+.stat-btn:active{transform:scale(.96);}
+.stat-btn .si{font-size:32px;display:block;margin-bottom:7px;}
+.stat-btn .sn{font-size:17px;font-weight:700;color:var(--txt);}
+.stat-btn .ss{font-size:11px;color:var(--muted);margin-top:2px;}
+
+/* 활성 상태 */
+.stat-btn.sp{border-color:var(--gr-fg);background:var(--gr-bg);box-shadow:0 0 0 3px rgba(30,122,65,.12);}
+.stat-btn.sp .sn{color:var(--gr-fg);}
+.stat-btn.sl{border-color:var(--or-fg);background:var(--or-bg);box-shadow:0 0 0 3px rgba(183,119,13,.12);}
+.stat-btn.sl .sn{color:var(--or-fg);}
+
+/* ★ 시간 잠김 상태 */
+.stat-btn.time-locked{opacity:.28;cursor:not-allowed;filter:grayscale(.7);}
+.stat-btn.time-locked:active{transform:none;}
+.stat-btn.time-locked::after{content:'🔒';position:absolute;top:7px;right:9px;font-size:12px;}
+
+/* ── 제출 버튼 ─────────────────────────────────────────────── */
+.sub-btn{width:100%;padding:17px;font-size:17px;font-weight:700;border:none;border-radius:var(--R);margin-top:12px;cursor:pointer;transition:all .14s;}
+.sub-btn.on{background:var(--pr);color:#fff;box-shadow:0 4px 18px rgba(0,0,0,.15);}
+.sub-btn.on:active{transform:scale(.98);}
+.sub-btn.off{background:#e8dff2;color:#b0a0c0;cursor:not-allowed;}
+
+/* ── 기록 ──────────────────────────────────────────────────── */
+.rec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.cnt-chip{background:var(--pr-pl);color:var(--pr-dk);font-size:12px;font-weight:700;padding:3px 12px;border-radius:20px;}
+.upd-time{font-size:11px;color:var(--muted);margin-top:4px;}
+.rec-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid #f2f2f2;}
+.rec-row:last-child{border-bottom:none;}
+.r-name{font-size:15px;font-weight:600;}.r-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.badge{font-size:12px;font-weight:700;padding:5px 13px;border-radius:20px;}
+.bp{background:var(--gr-bg);color:var(--gr-fg);}.bl{background:var(--or-bg);color:var(--or-fg);}
+.empty-msg{text-align:center;padding:26px;color:var(--muted);font-size:14px;}
+
+/* ── 관리자 ────────────────────────────────────────────────── */
+.adm-hdr{background:#1a252f;color:#fff;padding:52px 16px 18px;display:flex;align-items:center;gap:12px;}
+.back-btn{background:rgba(255,255,255,.12);border:none;color:#fff;width:38px;height:38px;border-radius:50%;font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.adm-hdr h2{font-size:18px;font-weight:700;}
+.adm-sec{margin:14px 14px 0;}
+.adm-sec-ttl{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.7px;text-transform:uppercase;margin-bottom:8px;padding-left:2px;}
+.add-row{display:flex;gap:8px;}
+.inp,.grade-inp{padding:12px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7;color:var(--txt);}
+.inp:focus,.grade-inp:focus{outline:none;border-color:var(--pr);background:#fff;}
+.grade-inp{width:120px;appearance:none;cursor:pointer;padding-right:8px;flex-shrink:0;}
+.name-inp{flex:1;}.add-btn{padding:12px 16px;background:var(--pr);color:#fff;border:none;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.excel-desc{font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:12px;}
+.excel-desc b{color:var(--txt);}
+.excel-btns{display:flex;gap:8px;margin-bottom:12px;}
+.excel-select-btn{flex:1;padding:12px;font-size:14px;font-weight:600;background:var(--pr-pl);color:var(--pr-dk);border:1.5px dashed var(--pr);border-radius:var(--r);cursor:pointer;text-align:center;}
+.excel-tpl-btn{padding:12px 14px;font-size:14px;font-weight:600;background:#f7f7f7;color:var(--muted);border:1.5px solid var(--bdr);border-radius:var(--r);cursor:pointer;white-space:nowrap;}
+.excel-preview{border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden;margin-bottom:10px;display:none;}
+.excel-preview-hdr{background:#f7f7f7;padding:8px 12px;font-size:12px;font-weight:700;color:var(--muted);display:flex;justify-content:space-between;}
+.excel-preview-list{max-height:200px;overflow-y:auto;}
+.excel-preview-row{display:flex;justify-content:space-between;padding:9px 12px;border-top:1px solid var(--bdr);font-size:14px;}
+.excel-preview-row.dup{opacity:.4;}
+.excel-preview-row .pr-name{font-weight:600;}.excel-preview-row .pr-grade{color:var(--muted);}
+.excel-upload-btn{width:100%;padding:13px;font-size:15px;font-weight:700;background:var(--pr);color:#fff;border:none;border-radius:var(--r);cursor:pointer;display:none;}
+.stu-item{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--card);border-radius:var(--r);margin-bottom:7px;box-shadow:0 1px 5px rgba(0,0,0,.06);}
+.stu-name{font-size:15px;font-weight:600;}
+.stu-grade{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--pr-pl);color:var(--pr-dk);display:inline-block;margin-top:3px;}
+.del-btn{background:var(--rd-bg);color:var(--rd-fg);border:none;width:32px;height:32px;border-radius:50%;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.sett-row{margin-bottom:14px;}
+.sett-lbl{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px;}
+.sett-sub{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;}
+.sett-inp{width:100%;padding:12px 14px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7;color:var(--txt);}
+.sett-inp:focus{outline:none;border-color:var(--pr);background:#fff;}
+.sett-inp.ro{background:#f0f0f0;color:var(--muted);cursor:default;font-size:12px;}
+.color-wrap{display:flex;gap:8px;align-items:center;}
+.color-wrap .sett-inp{flex:1;}
+.color-pick{width:48px;height:44px;border:1.5px solid var(--bdr);border-radius:var(--r);padding:4px;cursor:pointer;background:#f7f7f7;}
+.time-wrap{display:flex;gap:8px;align-items:center;}
+.time-wrap .sett-inp{flex:1;}
+.time-preview{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:var(--r);font-size:12px;font-weight:600;}
+.time-preview.present{background:var(--gr-bg);color:var(--gr-fg);}
+.time-preview.late{background:var(--or-bg);color:var(--or-fg);}
+.sync-badge{display:inline-flex;align-items:center;gap:5px;background:#e8f8f5;color:#1a7a5a;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;margin-bottom:14px;}
+.divider{height:1px;background:var(--bdr);margin:18px 0;}
+.copy-btn{width:100%;padding:10px;background:var(--bl-bg);color:var(--bl-fg);border:none;border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;margin-top:4px;}
+.save-sett{width:100%;padding:15px;background:#1a252f;color:#fff;border:none;border-radius:var(--R);font-size:16px;font-weight:700;cursor:pointer;margin-top:4px;margin-bottom:6px;}
+.change-dept-btn{width:100%;padding:13px;background:#f8f0ff;color:var(--pr-dk);border:1.5px solid var(--pr-pl);border-radius:var(--R);font-size:15px;font-weight:600;cursor:pointer;margin-bottom:30px;}
+
+/* ── 모달 ──────────────────────────────────────────────────── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.54);z-index:100;align-items:center;justify-content:center;padding:20px;}
+.overlay.show{display:flex;}
+.modal{background:#fff;border-radius:var(--R);padding:26px 22px;width:100%;max-width:340px;box-shadow:0 24px 60px rgba(0,0,0,.25);}
+.modal h3{font-size:19px;font-weight:700;text-align:center;margin-bottom:6px;}
+.modal .mbody{font-size:14px;color:var(--muted);text-align:center;line-height:1.7;margin-bottom:18px;}
+.modal .mname{font-size:17px;font-weight:700;color:var(--txt);text-align:center;margin-bottom:14px;}
+.mbtn{width:100%;padding:14px;font-size:16px;font-weight:700;border:none;border-radius:var(--r);cursor:pointer;margin-top:8px;}
+.mbtn-p{background:var(--pr);color:#fff;}.mbtn-s{background:#f0f0f0;color:var(--txt);}
+.pw-inp{width:100%;padding:14px;font-size:22px;text-align:center;letter-spacing:8px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7;margin-bottom:4px;}
+.pw-inp:focus{outline:none;border-color:var(--pr);}
+.pw-err{font-size:13px;color:var(--rd-fg);text-align:center;margin-top:6px;min-height:18px;}
+
+/* ── 로딩 / 토스트 ─────────────────────────────────────────── */
+.load-ov{display:none;position:fixed;inset:0;background:rgba(255,255,255,.88);z-index:200;align-items:center;justify-content:center;flex-direction:column;gap:12px;backdrop-filter:blur(4px);}
+.load-ov.show{display:flex;}
+.spin{width:44px;height:44px;border:4px solid #e0d8e8;border-top-color:var(--pr);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.load-txt{font-size:14px;color:var(--pr-dk);font-weight:600;}
+.toast{position:fixed;bottom:34px;left:50%;transform:translateX(-50%) translateY(120px);background:#1a252f;color:#fff;padding:13px 26px;border-radius:30px;font-size:14px;font-weight:600;z-index:300;transition:transform .3s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.22);}
+.toast.show{transform:translateX(-50%) translateY(0);}
+</style>
+
+<!-- ════════════ 부서 선택 화면 ════════════ -->
+<div id="s-dept" class="screen active">
+  <div class="dept-wrap">
+    <div class="dept-top">
+      <div class="cross">✝</div>
+      <h1>주일 출석체크</h1>
+      <p>소속 부서를 선택하세요<br>한 번 선택하면 다음부터 자동으로 연결됩니다</p>
+    </div>
+    <div class="dept-grid" id="dept-grid"></div>
+    <button class="dept-admin-link" onclick="showDeptAdminPw()">⚙ 관리자 · 부서 설정</button>
+  </div>
+</div>
+
+<!-- ════════════ 메인 화면 ════════════ -->
+<div id="s-main" class="screen">
+  <div class="hdr" id="main-hdr">
+    <button class="icon-btn left" onclick="goToDeptSelect()" title="부서 변경">🏛</button>
+    <div>
+      <div class="dept-tag" id="dept-tag"></div>
+      <h1 id="app-title">주일 출석체크</h1>
+      <div class="dt" id="today-str"></div>
+      <!-- ★ 예배 시간 상태 뱃지 -->
+      <div class="time-badge none" id="time-badge"></div>
+    </div>
+    <button class="icon-btn right" id="gear-btn">⚙</button>
+  </div>
+
+  <div class="card">
+    <div class="lbl" id="sel-label">학년 · 이름 선택</div>
+    <div class="sel-row">
+      <select id="grade-sel" onchange="onGradeChange()"><option value="">전체</option></select>
+      <select id="name-sel"  onchange="onNameChange()"><option value="">이름 선택...</option></select>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="lbl">출석 확인</div>
+    <button class="single-btn off" id="sub-btn" onclick="doSubmit()">
+      <span class="sb-icon">🙌</span>
+      출석 확인하기
+      <div class="sb-sub" id="sub-btn-sub"></div>
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="rec-hdr">
+      <div><div class="lbl" style="margin:0">오늘 출석 현황</div><div class="upd-time" id="upd-time"></div></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button onclick="refreshAll()" style="background:var(--pr-pl);color:var(--pr-dk);border:none;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;">↻ 새로고침</button>
+        <div class="cnt-chip" id="cnt-chip">0명</div>
+      </div>
+    </div>
+    <div id="rec-list"><div class="empty-msg">📋 아직 출석 기록이 없어요</div></div>
+  </div>
+</div>
+
+<!-- ════════════ 관리자 화면 ════════════ -->
+<div id="s-admin" class="screen">
+  <div class="adm-hdr">
+    <button class="back-btn" onclick="goMain()">←</button>
+    <h2>관리자 패널 <span id="admin-dept-label" style="font-size:14px;opacity:.7"></span></h2>
+  </div>
+
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">학생 개별 추가</div>
+    <div class="card" style="padding:14px">
+      <!-- 학년 선택 (학년제 부서) -->
+      <div class="add-row" id="grade-add-row">
+        <select class="grade-inp" id="new-grade">
+          <option value="">학년 선택</option>
+          <option>초등1</option><option>초등2</option><option>초등3</option>
+          <option>초등4</option><option>초등5</option><option>초등6</option>
+          <option>중1</option><option>중2</option><option>중3</option>
+          <option>고1</option><option>고2</option><option>고3</option>
+        </select>
+        <input class="inp name-inp" id="new-name" type="text" placeholder="이름 입력"
+               onkeydown="if(event.key==='Enter')addStudent()"/>
+        <button class="add-btn" onclick="addStudent()">추가</button>
+      </div>
+      <!-- 출생연도 입력 (연도제 부서) -->
+      <div class="add-row" id="year-add-row" style="display:none">
+        <input class="inp" id="new-year" type="number" placeholder="출생연도 (예: 92)"
+               style="width:130px;flex-shrink:0" min="1" max="2099"
+               onkeydown="if(event.key==='Enter')addStudent()"/>
+        <input class="inp name-inp" id="new-name-year" type="text" placeholder="이름 입력"
+               onkeydown="if(event.key==='Enter')addStudent()"/>
+        <button class="add-btn" onclick="addStudent()">추가</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">엑셀 일괄 등록</div>
+    <div class="card">
+      <p class="excel-desc" id="excel-desc"><b>A열: 이름 / B열: 학년</b> 형식의 엑셀 파일을 업로드하세요.</p>
+      <div class="excel-btns">
+        <label class="excel-select-btn" for="excel-file">📂 엑셀 파일 선택</label>
+        <button class="excel-tpl-btn" onclick="downloadTemplate()">📋 샘플 양식</button>
+      </div>
+      <input type="file" id="excel-file" accept=".xlsx,.xls" style="display:none" onchange="onExcelFile(event)"/>
+      <div class="excel-preview" id="excel-preview">
+        <div class="excel-preview-hdr"><span id="preview-count">미리보기</span><span style="font-weight:400">흐림=이미 등록됨</span></div>
+        <div class="excel-preview-list" id="preview-list"></div>
+      </div>
+      <button class="excel-upload-btn" id="excel-upload-btn" onclick="uploadExcel()">일괄 등록하기</button>
+    </div>
+  </div>
+
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">등록된 학생 <span id="stu-count" style="font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+    <div id="stu-list"></div>
+  </div>
+
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">앱 설정</div>
+    <div class="card">
+      <div class="sync-badge">🔄 저장 시 이 부서 접속자 전원에게 즉시 동기화</div>
+
+      <div class="sett-row">
+        <div class="sett-lbl">앱 이름</div>
+        <input class="sett-inp" id="s-name" type="text"/>
+      </div>
+      <div class="sett-row">
+        <div class="sett-lbl">메인 색상</div>
+        <div class="color-wrap">
+          <input class="sett-inp" id="s-color-txt" type="text" placeholder="#7D3C98"/>
+          <input class="color-pick" id="s-color-pick" type="color" value="#7D3C98" oninput="onPickerChange()"/>
+        </div>
+      </div>
+      <div class="sett-row">
+        <div class="sett-lbl">관리자 비밀번호 변경</div>
+        <input class="sett-inp" id="s-pw" type="password" placeholder="새 비밀번호 (비우면 기존 유지)"/>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- ★ 예배 시간 설정 -->
+      <div class="sett-row">
+        <div class="sett-lbl">예배 시작 시간 ⏰
+          <span style="font-size:11px;font-weight:400;color:var(--muted)"> · 이 시간 전=출석만, 이후=지각만</span>
+        </div>
+        <div class="time-wrap">
+          <input class="sett-inp" id="s-worship-time" type="time" placeholder="09:30" oninput="previewTime()"/>
+          <div class="time-preview" id="time-preview"></div>
+        </div>
+        <div class="sett-sub">비워두면 시간 제한 없이 출석·지각 모두 선택 가능합니다.</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="sett-row">
+        <div class="sett-lbl">Google Apps Script URL</div>
+        <input class="sett-inp" id="s-script-url" type="url" placeholder="https://script.google.com/macros/s/..."/>
+        <div class="sett-sub">변경 시 이 기기에만 적용됩니다.</div>
+      </div>
+      <div class="sett-row">
+        <div class="sett-lbl">공유 링크</div>
+        <input class="sett-inp ro" id="s-url-display" type="text" readonly/>
+        <button class="copy-btn" onclick="copyShareUrl()">🔗 링크 복사 (카톡 공유용)</button>
+      </div>
+
+      <button class="save-sett" onclick="saveSettings()">💾 설정 저장</button>
+      <button class="change-dept-btn" onclick="changeDept()">🏛 부서 변경하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ 모달 ════════════ -->
+<div class="overlay" id="pw-modal">
+  <div class="modal">
+    <h3>🔒 관리자 인증</h3>
+    <div class="mbody">관리자 비밀번호를 입력하세요<br><small style="font-size:11px">(초기값: 1234)</small></div>
+    <input class="pw-inp" id="pw-inp" type="password" placeholder="••••"
+           onkeydown="if(event.key==='Enter')checkPw()"/>
+    <div class="pw-err" id="pw-err"></div>
+    <button class="mbtn mbtn-p" onclick="checkPw()">확인</button>
+    <button class="mbtn mbtn-s" onclick="closeModal('pw-modal')">취소</button>
+  </div>
+</div>
+<div class="overlay" id="dup-attend-modal">
+  <div class="modal">
+    <h3>⚠️ 이미 출석체크 되었습니다</h3>
+    <div class="mname" id="dup-attend-name"></div>
+    <div class="mbody">오늘 이미 출석이 등록되어 있습니다.<br>혹시 실수로 다른 이름을 선택하지 않았나요?</div>
+    <button class="mbtn mbtn-s" onclick="closeModal('dup-attend-modal')">확인</button>
+  </div>
+</div>
+<div class="overlay" id="dup-student-modal">
+  <div class="modal">
+    <h3>⚠️ 중복된 학생입니다</h3>
+    <div class="mname" id="dup-student-name"></div>
+    <div class="mbody">같은 이름과 학년으로 이미 등록된 학생이 있습니다.<br>이름 또는 학년을 다시 확인해주세요.</div>
+    <button class="mbtn mbtn-p" onclick="closeModal('dup-student-modal')">수정하기</button>
+  </div>
+</div>
+
+<!-- 부서 관리자 비밀번호 모달 -->
+<div class="overlay" id="dept-pw-modal">
+  <div class="modal">
+    <h3>🔒 부서 관리자 인증</h3>
+    <div class="mbody">부서 설정 관리자 비밀번호를<br>입력하세요</div>
+    <input class="pw-inp" id="dept-pw-inp" type="password" placeholder="••••"
+           onkeydown="if(event.key==='Enter')checkDeptAdminPw()"/>
+    <div class="pw-err" id="dept-pw-err"></div>
+    <button class="mbtn mbtn-p" onclick="checkDeptAdminPw()">확인</button>
+    <button class="mbtn mbtn-s" onclick="closeModal('dept-pw-modal')">취소</button>
+  </div>
+</div>
+
+<!-- 부서 활성화/비활성화 관리 시트 -->
+<div class="dept-admin-overlay" id="dept-admin-overlay">
+  <div class="dept-admin-sheet">
+    <div class="dept-admin-drag"></div>
+    <div class="dept-admin-title">📋 부서 활성화 관리
+      <div style="font-size:12px;font-weight:400;color:var(--muted);margin-top:3px">비활성화된 부서는 선택 화면에서 흐리게 표시됩니다</div>
+    </div>
+    <div id="dept-toggle-list"></div>
+    <button class="dept-admin-save" onclick="saveDeptVisibility()">저장하기</button>
+  </div>
+</div>
+
+<div class="load-ov" id="loading"><div class="spin"></div><div class="load-txt" id="load-txt">불러오는 중...</div></div>
+<div class="toast" id="toast"></div>
+
+<!-- ════════════ JAVASCRIPT ════════════ -->
+<script>
+// ── 전역 상태 ────────────────────────────────────────────────
+let currentDept    = null;   // { name, emoji, url }
+let scriptUrl      = '';
+let remoteSettings = {};
+let students       = [];
+let selStatus      = null;
+let parsedXlsx     = [];
+let refreshTimer   = null;
+let timeTimer      = null;
+
+// ── 날짜 캐시 ────────────────────────────────────────────────
+function dateKey(){
+  const d=new Date();
+  return `ch_rec_${currentDept?.name}_${d.getFullYear()}_${d.getMonth()+1}_${d.getDate()}`;
+}
+function getCache(){ try{ return JSON.parse(localStorage.getItem(dateKey())||'[]'); }catch(e){ return []; } }
+function setCache(r){ localStorage.setItem(dateKey(), JSON.stringify(r)); }
+
+// ── 테마 ─────────────────────────────────────────────────────
+function applyTheme(hex, name){
+  if (!hex) return;
+  const h=hex.replace('#','');
+  const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+  const toH=n=>n.toString(16).padStart(2,'0');
+  document.documentElement.style.setProperty('--pr',hex);
+  document.documentElement.style.setProperty('--pr-dk',`#${toH(Math.round(r*.72))}${toH(Math.round(g*.72))}${toH(Math.round(b*.72))}`);
+  document.documentElement.style.setProperty('--pr-pl',`#${toH(Math.round(r*.10+229.5))}${toH(Math.round(g*.10+229.5))}${toH(Math.round(b*.10+229.5))}`);
+  if (name){ document.getElementById('app-title').textContent=name; document.title=name; }
+}
+
+// ── ★ 예배 시간 기반 출석 모드 ──────────────────────────────
+// 반환값: 'present'(출석만) | 'late'(지각만) | 'none'(제한없음)
+function getAttendanceMode(){
+  const wt = (remoteSettings.worshipTime || '').trim();
+  if (!wt || !wt.includes(':')) return 'none';
+  const [wh, wm] = wt.split(':').map(Number);
+  const now = new Date();
+  const curMins = now.getHours() * 60 + now.getMinutes();
+  const worMins = wh * 60 + wm;
+  return curMins <= worMins ? 'present' : 'late';
+}
+
+function updateTimeBadge(){
+  const mode = getAttendanceMode();
+  const badge = document.getElementById('time-badge');
+  const wt = (remoteSettings.worshipTime || '').trim();
+  if (mode === 'none' || !wt){
+    badge.className='time-badge none'; badge.textContent=wt?`예배 ${wt}`:'';
+  } else if (mode === 'present'){
+    badge.className='time-badge present'; badge.textContent=`🟢 출석 시간 · 예배 ${wt}`;
+  } else {
+    badge.className='time-badge late'; badge.textContent=`🟠 지각 처리 중 · 예배 ${wt}`;
+  }
+
+  // ★ 단일 버튼 안내 문구 업데이트 (선택적 - 아이들에게 보임)
+  const sub = document.getElementById('sub-btn-sub');
+  if (sub) {
+    if (mode === 'none' || !wt) sub.textContent = '';
+    else if (mode === 'present') sub.textContent = `예배 시작(${wt}) 전 · 출석으로 기록됩니다`;
+    else sub.textContent = `예배 시작(${wt}) 후 · 지각으로 기록됩니다`;
+  }
+}
+
+function updateButtonStates(){
+  // 단일 버튼이므로 시간 잠금 불필요 - 이름 선택 여부만 체크
+  updateTimeBadge();
+  updateSubBtn();
+}
+
+// ── 초기화 ───────────────────────────────────────────────────
+const DAYS=['일','월','화','수','목','금','토'];
+const now=new Date();
+document.getElementById('today-str').textContent=
+  `${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 (${DAYS[now.getDay()]})`;
+
+document.getElementById('gear-btn').addEventListener('click',()=>{
+  document.getElementById('pw-inp').value='';
+  document.getElementById('pw-err').textContent='';
+  openModal('pw-modal');
+  setTimeout(()=>document.getElementById('pw-inp').focus(),300);
+});
+
+// 부서 선택 화면 렌더링
+renderDeptGrid();
+
+// 저장된 부서 있으면 자동 연결
+const savedDeptName = localStorage.getItem('ch_dept');
+if (savedDeptName){
+  const saved = DEPARTMENTS.find(d=>d.name===savedDeptName);
+  if (saved) selectDept(saved, false);
+}
+
+// ── 부서 가시성 관리 ──────────────────────────────────────────
+function loadDeptVisibility(){
+  try{ return JSON.parse(localStorage.getItem('ch_dept_visibility') || '{}'); }
+  catch(e){ return {}; }
+}
+
+function isDeptActive(deptName){
+  const vis = loadDeptVisibility();
+  return vis[deptName] !== false; // 기본값 활성
+}
+
+function showDeptAdminPw(){
+  document.getElementById('dept-pw-inp').value='';
+  document.getElementById('dept-pw-err').textContent='';
+  openModal('dept-pw-modal');
+  setTimeout(()=>document.getElementById('dept-pw-inp').focus(),300);
+}
+
+function checkDeptAdminPw(){
+  const pw = document.getElementById('dept-pw-inp').value;
+  if(pw === DEPT_ADMIN_PW){
+    closeModal('dept-pw-modal');
+    openDeptAdminPanel();
+  } else {
+    document.getElementById('dept-pw-err').textContent='비밀번호가 틀렸습니다';
+    document.getElementById('dept-pw-inp').value='';
+    document.getElementById('dept-pw-inp').focus();
+  }
+}
+
+function openDeptAdminPanel(){
+  const vis = loadDeptVisibility();
+  const list = document.getElementById('dept-toggle-list');
+  list.innerHTML = DEPARTMENTS.map(d=>{
+    const active = vis[d.name] !== false;
+    return `
+      <div class="dept-toggle-row">
+        <div class="dt-left">
+          <span class="dt-emoji">${d.emoji||'✝️'}</span>
+          <div>
+            <div class="dt-name">${esc(d.name)}</div>
+            <div class="dt-status ${active?'on':'off'}" id="dt-status-${d.name}">${active?'활성화됨':'비활성화됨'}</div>
+          </div>
+        </div>
+        <label class="toggle-wrap">
+          <input type="checkbox" id="dt-toggle-${d.name}" ${active?'checked':''}
+                 onchange="onDeptToggleChange('${d.name}', this.checked)"/>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>`;
+  }).join('');
+  document.getElementById('dept-admin-overlay').classList.add('show');
+}
+
+function onDeptToggleChange(deptName, checked){
+  const statusEl = document.getElementById(`dt-status-${deptName}`);
+  statusEl.className = `dt-status ${checked?'on':'off'}`;
+  statusEl.textContent = checked ? '활성화됨' : '비활성화됨';
+}
+
+function saveDeptVisibility(){
+  const vis = {};
+  DEPARTMENTS.forEach(d=>{
+    const el = document.getElementById(`dt-toggle-${d.name}`);
+    if(el) vis[d.name] = el.checked;
+  });
+  localStorage.setItem('ch_dept_visibility', JSON.stringify(vis));
+  document.getElementById('dept-admin-overlay').classList.remove('show');
+  renderDeptGrid();
+  showToast('부서 설정이 저장되었습니다 ✓');
+}
+
+// 부서 선택 화면으로 이동 (메인에서 호출)
+function goToDeptSelect(){
+  // 타이머 정지
+  if(refreshTimer) clearInterval(refreshTimer);
+  if(timeTimer)    clearInterval(timeTimer);
+  showScreen('s-dept');
+  renderDeptGrid();
+}
+
+// ── 부서 선택 ────────────────────────────────────────────────
+function renderDeptGrid(){
+  const grid = document.getElementById('dept-grid');
+  const saved = localStorage.getItem('ch_dept');
+  const visible = DEPARTMENTS.filter(d => isDeptActive(d.name));
+  grid.innerHTML = visible.map(d=>{
+    const isSelected = d.name === saved;
+    return `
+      <button class="dept-btn ${isSelected?'active-dept':''}"
+              onclick="selectDept(${JSON.stringify(d).replace(/"/g,'&quot;')})">
+        <span class="d-emoji">${d.emoji||'✝️'}</span>
+        <div class="d-name">${esc(d.name)}</div>
+      </button>`;
+  }).join('');
+}
+
+function selectDept(dept, showLoading=true){
+  currentDept = dept;
+  scriptUrl = localStorage.getItem('ch_scriptUrl_'+dept.name) || dept.url;
+  localStorage.setItem('ch_dept', dept.name);
+
+  document.getElementById('dept-tag').textContent = dept.name;
+  document.getElementById('admin-dept-label').textContent = '· ' + dept.name;
+
+  // ★ 부서 유형에 따라 학년 선택창 즉시 숨김/표시
+  const isYear = dept.type === 'year';
+  document.getElementById('grade-sel').style.display = isYear ? 'none' : '';
+  document.getElementById('sel-label').textContent   = isYear ? '이름 선택' : '학년 · 이름 선택';
+
+  showScreen('s-main');
+
+  const cached = getCache();
+  if (cached.length) renderRecords(cached, false);
+
+  bootApp(showLoading);
+}
+
+function changeDept(){
+  goMain();
+  setTimeout(()=>{ showScreen('s-dept'); renderDeptGrid(); }, 100);
+}
+
+// ── 앱 부트 ──────────────────────────────────────────────────
+async function bootApp(showLoad=true){
+  if (showLoad) setLoading(true,'앱 설정 불러오는 중...');
+  try{
+    await fetchSettings();
+    await Promise.all([fetchStudents(), fetchRecords()]);
+    startTimers();
+  }catch(e){ showToast('연결 실패: '+e.message, 4000); }
+  finally{ setLoading(false); }
+}
+
+function startTimers(){
+  // 출석 현황 60초 자동 갱신
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(fetchRecords, 60000);
+
+  // ★ 예배 시간 버튼 상태 30초마다 갱신
+  if (timeTimer) clearInterval(timeTimer);
+  updateButtonStates();
+  timeTimer = setInterval(updateButtonStates, 30000);
+}
+
+// ── API ──────────────────────────────────────────────────────
+async function api(params){
+  if (!scriptUrl || scriptUrl.includes('여기에_')) throw new Error('GAS URL이 설정되지 않았습니다');
+  const url = new URL(scriptUrl);
+  Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,String(v)));
+  url.searchParams.set('_t', Date.now());
+  const res = await fetch(url.toString(), {redirect:'follow', cache:'no-cache'});
+  if (!res.ok) throw new Error(`서버 오류 (HTTP ${res.status})`);
+  const text = await res.text();
+  try{ return JSON.parse(text); }
+  catch(e){ throw new Error('응답 파싱 오류'); }
+}
+
+// ── 설정 ─────────────────────────────────────────────────────
+async function fetchSettings(){
+  const data = await api({action:'getSettings'});
+  if (data.error) throw new Error(data.error);
+  remoteSettings = data.settings || {};
+  applyTheme(remoteSettings.primaryColor, remoteSettings.appName);
+  updateButtonStates(); // 예배시간 적용
+}
+
+async function saveSettings(){
+  const name   = document.getElementById('s-name').value.trim();
+  const color  = document.getElementById('s-color-txt').value.trim();
+  const pw     = document.getElementById('s-pw').value.trim();
+  const wt     = document.getElementById('s-worship-time').value.trim();
+  const newUrl = document.getElementById('s-script-url').value.trim();
+
+  if (newUrl){
+    if (!newUrl.startsWith('https://script.google.com')){ showToast('올바른 Apps Script URL을 입력해주세요'); return; }
+    scriptUrl = newUrl;
+    localStorage.setItem('ch_scriptUrl_'+currentDept.name, newUrl);
+  }
+
+  const params = {action:'saveSettings'};
+  if (name)          params.appName       = name;
+  if (color)         params.primaryColor  = color;
+  if (pw)            params.adminPassword = pw;
+  if (wt !== undefined) params.worshipTime = wt; // 빈 문자열도 저장 가능 (해제)
+
+  setLoading(true,'저장 중...');
+  try{
+    const data = await api(params);
+    if (data.error){ showToast('오류: '+data.error); return; }
+    remoteSettings = data.settings || {};
+    applyTheme(remoteSettings.primaryColor, remoteSettings.appName);
+    updateButtonStates();
+    document.getElementById('s-pw').value='';
+    showToast('✅ 저장 완료! 모든 기기에 동기화됩니다');
+  }catch(e){ showToast('오류: '+e.message); }
+  finally{ setLoading(false); }
+}
+
+// 설정 화면 열 때 예배 시간 미리보기
+function previewTime(){
+  const wt = document.getElementById('s-worship-time').value.trim();
+  const el = document.getElementById('time-preview');
+  if (!wt){ el.textContent=''; el.className='time-preview'; return; }
+  const [wh,wm] = wt.split(':').map(Number);
+  const now = new Date();
+  const cur = now.getHours()*60+now.getMinutes();
+  const wor = wh*60+wm;
+  if (cur<=wor){ el.className='time-preview present'; el.textContent='현재: 출석 시간'; }
+  else         { el.className='time-preview late';    el.textContent='현재: 지각 처리'; }
+}
+
+// ── 데이터 로드 ───────────────────────────────────────────────
+async function fetchStudents(){
+  const data=await api({action:'students'});
+  if(data.error) throw new Error(data.error);
+  students=data.students||[];
+  buildGradeFilter(); renderStudentList();
+}
+async function fetchRecords(){
+  const data=await api({action:'records'});
+  if(data.error) throw new Error(data.error);
+  setCache(data.records||[]);
+  renderRecords(data.records||[],true);
+}
+async function refreshAll(){
+  setLoading(true,'새로고침 중...');
+  try{ await Promise.all([fetchSettings(),fetchStudents(),fetchRecords()]); }
+  catch(e){ showToast('오류: '+e.message); }
+  finally{ setLoading(false); }
+}
+
+// ── 기록 렌더링 ───────────────────────────────────────────────
+function renderRecords(records, showTime){
+  document.getElementById('cnt-chip').textContent=`${records.length}명`;
+  if(showTime){
+    const t=new Date();
+    document.getElementById('upd-time').textContent=
+      `${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')} 기준`;
+  }
+  const el=document.getElementById('rec-list');
+  if(!records.length){ el.innerHTML='<div class="empty-msg">📋 아직 출석 기록이 없어요</div>'; return; }
+  el.innerHTML=records.map(r=>`
+    <div class="rec-row">
+      <div><div class="r-name">${esc(dispName(r))}</div><div class="r-meta">${esc(r.grade)} · ${esc(r.time)}</div></div>
+      <span class="badge ${r.status==='출석'?'bp':'bl'}">${esc(r.status)}</span>
+    </div>`).join('');
+}
+
+// ── ★ 헬퍼 함수 ──────────────────────────────────────────────
+
+// 현재 부서가 출생연도 방식인지 여부
+function isDeptYearType(){
+  return !!(currentDept && currentDept.type === 'year');
+}
+
+// 이름 표시: 연도제 부서는 "이름(연도)", 학년제는 "이름"
+function dispName(student){
+  if (isDeptYearType() && student.grade) return `${student.name}(${student.grade})`;
+  return student.name;
+}
+
+// ★ 한국어 가나다 정렬 (등록 순서와 무관하게 항상 ㄱ→ㅎ)
+function koreanSort(arr){
+  return [...arr].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+}
+
+// ── 학년 필터 ─────────────────────────────────────────────────
+function buildGradeFilter(){
+  const gradeSel = document.getElementById('grade-sel');
+  if (isDeptYearType()){
+    // 연도제 부서: 학년 필터 숨김
+    gradeSel.style.display = 'none';
+    onGradeChange();
+    return;
+  }
+  gradeSel.style.display = '';
+  const grades=[...new Set(students.map(s=>s.grade))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const prev=gradeSel.value;
+  gradeSel.innerHTML='<option value="">전체</option>';
+  grades.forEach(g=>{ const o=document.createElement('option'); o.value=g; o.textContent=g; if(g===prev)o.selected=true; gradeSel.appendChild(o); });
+  onGradeChange();
+}
+function onGradeChange(){
+  const grade = isDeptYearType() ? '' : document.getElementById('grade-sel').value;
+  const filtered = grade ? students.filter(s=>s.grade===grade) : students;
+  // ★ 항상 가나다 순 정렬
+  const sorted = koreanSort(filtered);
+  const sel = document.getElementById('name-sel');
+  const prev = sel.value;
+  sel.innerHTML='<option value="">이름 선택...</option>';
+  sorted.forEach(s=>{
+    const o=document.createElement('option');
+    o.value=s.name;
+    o.textContent=dispName(s);  // 연도제: "이름(연도)"
+    if(s.name===prev) o.selected=true;
+    sel.appendChild(o);
+  });
+  updateSubBtn();
+}
+function onNameChange(){ updateSubBtn(); }
+
+// ★ 제출 버튼 활성/비활성 업데이트
+function updateSubBtn(){
+  const ok = !!document.getElementById('name-sel').value;
+  document.getElementById('sub-btn').className = ok ? 'single-btn on' : 'single-btn off';
+}
+
+// ── 출석 제출 (시간에 따라 자동으로 출석/지각 판별) ─────────────
+async function doSubmit(){
+  const name = document.getElementById('name-sel').value;
+  const grade = (students.find(s=>s.name===name)||{}).grade||'';
+  if (!name) return;
+
+  // ★ 버튼은 하나 - 시스템이 시간 보고 자동 판별
+  const mode = getAttendanceMode();
+  const status = (mode === 'late') ? '지각' : '출석';
+
+  setLoading(true,'저장 중...');
+  try{
+    const data = await api({action:'submit', name, grade, status});
+    if (data.duplicate){
+      document.getElementById('dup-attend-name').textContent=`${name} (${grade})`;
+      openModal('dup-attend-modal'); return;
+    }
+    if (data.error){ showToast('오류: '+data.error); return; }
+    setCache(data.records||[]); renderRecords(data.records||[],true);
+    // ★ 아이들에게는 항상 같은 메시지 (지각 여부 노출 안 함)
+    showToast(`${name} 출석 완료! 🙌`);
+    resetForm();
+  }catch(e){ showToast('연결 오류: '+e.message, 4000); }
+  finally{ setLoading(false); }
+}
+function resetForm(){
+  document.getElementById('name-sel').value='';
+  updateSubBtn();
+}
+
+// ── 학생 관리 ─────────────────────────────────────────────────
+
+// ★ 출생연도 2자리로 통일: 1992→92, 2005→05, 92→92, 5→05
+function normalizeYear(input){
+  const s = String(input).trim();
+  const n = parseInt(s);
+  if (isNaN(n)) return s;
+  if (n >= 1900 && n <= 1999) return String(n - 1900);           // 1992 → "92"
+  if (n >= 2000 && n <= 2099) return String(n - 2000).padStart(2,'0'); // 2005 → "05"
+  if (n >= 0    && n <= 99)   return String(n).padStart(2,'0');  // 5 → "05", 92 → "92"
+  return s;
+}
+
+async function addStudent(){
+  const isYear = isDeptYearType();
+  const name  = (isYear
+    ? document.getElementById('new-name-year')
+    : document.getElementById('new-name')).value.trim();
+  const rawGrade = isYear
+    ? String(document.getElementById('new-year').value).trim()
+    : document.getElementById('new-grade').value;
+  // ★ 연도제 부서는 입력값 자동 정규화
+  const grade = isYear ? normalizeYear(rawGrade) : rawGrade;
+
+  if (!name){ showToast('이름을 입력해주세요'); return; }
+  if (!grade){ showToast(isYear ? '출생연도를 입력해주세요' : '학년을 선택해주세요'); return; }
+
+  setLoading(true,'추가 중...');
+  try{
+    const data=await api({action:'addStudent',name,grade});
+    if(data.duplicate){ document.getElementById('dup-student-name').textContent=`${name} (${grade})`; openModal('dup-student-modal'); return; }
+    if(data.error){showToast('오류: '+data.error);return;}
+    students=data.students||[]; renderStudentList(); buildGradeFilter();
+    if(isYear){ document.getElementById('new-name-year').value=''; document.getElementById('new-year').value=''; }
+    else      { document.getElementById('new-name').value=''; document.getElementById('new-grade').value=''; }
+    showToast(`${name} 추가 완료 ✓`);
+  }catch(e){showToast('연결 오류: '+e.message);}
+  finally{setLoading(false);}
+}
+async function removeStudent(name,grade){
+  if(!confirm(`"${name}" 학생을 삭제하시겠습니까?`)) return;
+  setLoading(true,'삭제 중...');
+  try{
+    const data=await api({action:'removeStudent',name,grade});
+    if(data.error){showToast('오류: '+data.error);return;}
+    students=data.students||[]; renderStudentList(); buildGradeFilter();
+    showToast(`${name} 삭제됨`);
+  }catch(e){showToast('연결 오류: '+e.message);}
+  finally{setLoading(false);}
+}
+function renderStudentList(){
+  const el=document.getElementById('stu-list');
+  document.getElementById('stu-count').textContent=`(${students.length}명)`;
+  if(!students.length){el.innerHTML='<div class="empty-msg" style="background:#fff;border-radius:10px;padding:20px">등록된 학생이 없습니다</div>';return;}
+  // ★ 관리자 목록도 가나다 정렬
+  const sorted = koreanSort(students);
+  el.innerHTML=sorted.map(s=>`
+    <div class="stu-item">
+      <div>
+        <div class="stu-name">${esc(s.name)}</div>
+        <span class="stu-grade">${isDeptYearType() ? (s.grade+'년생') : esc(s.grade)}</span>
+      </div>
+      <button class="del-btn" onclick="removeStudent('${esc(s.name)}','${esc(s.grade)}')">✕</button>
+    </div>`).join('');
+}
+
+// ── 엑셀 ─────────────────────────────────────────────────────
+function onExcelFile(event){
+  const file=event.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      let start=0;
+      if(rows.length>0){const r0=rows[0].map(c=>String(c).trim().toLowerCase()); if(r0.includes('이름')||r0.includes('name')) start=1;}
+      const existSet=new Set(students.map(s=>`${s.name}__${s.grade}`));
+      parsedXlsx=[];
+      for(let i=start;i<rows.length;i++){
+        const name=String(rows[i][0]||'').trim();
+        // ★ 연도제 부서면 B열 값을 자동 정규화
+        const rawGrade=String(rows[i][1]||'').trim();
+        const grade = isDeptYearType() ? normalizeYear(rawGrade) : (rawGrade||'미지정');
+        if(!name) continue;
+        parsedXlsx.push({name,grade,dup:existSet.has(`${name}__${grade}`)});
+      }
+      showExcelPreview();
+    }catch(err){showToast('파일 읽기 오류: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+function showExcelPreview(){
+  const preview=document.getElementById('excel-preview'),btn=document.getElementById('excel-upload-btn'),plist=document.getElementById('preview-list');
+  if(!parsedXlsx.length){preview.style.display='block';plist.innerHTML='<div style="padding:12px;font-size:13px;color:var(--rd-fg)">데이터를 찾을 수 없습니다.</div>';btn.style.display='none';return;}
+  const newCount=parsedXlsx.filter(s=>!s.dup).length;
+  document.getElementById('preview-count').textContent=`총 ${parsedXlsx.length}명 (신규 ${newCount}명)`;
+  plist.innerHTML=parsedXlsx.map(s=>`<div class="excel-preview-row ${s.dup?'dup':''}"><span class="pr-name">${esc(s.name)}</span><span class="pr-grade">${esc(s.grade)}${s.dup?' ✓':''}</span></div>`).join('');
+  preview.style.display='block';
+  if(newCount>0){btn.style.display='block';btn.textContent=`신규 ${newCount}명 일괄 등록하기`;}
+  else{btn.style.display='none';showToast('모두 이미 등록된 학생입니다');}
+}
+async function uploadExcel(){
+  const toAdd=parsedXlsx.filter(s=>!s.dup); if(!toAdd.length) return;
+  setLoading(true,`${toAdd.length}명 일괄 등록 중...`);
+  try{
+    const data=await api({action:'bulkAddStudents',students:JSON.stringify(toAdd.map(s=>({name:s.name,grade:s.grade})))});
+    if(data.error){showToast('오류: '+data.error);return;}
+    students=data.students||[]; renderStudentList(); buildGradeFilter();
+    showToast(`완료: ${(data.added||[]).length}명 추가`);
+    parsedXlsx=[]; document.getElementById('excel-preview').style.display='none';
+    document.getElementById('excel-upload-btn').style.display='none';
+    document.getElementById('excel-file').value='';
+  }catch(e){showToast('연결 오류: '+e.message);}
+  finally{setLoading(false);}
+}
+function downloadTemplate(){
+  const isYear = isDeptYearType();
+
+  if (isYear) {
+    // 연도제 부서: 출생연도 양식
+    const ws = XLSX.utils.aoa_to_sheet([['이름','출생연도'],['홍길동','92'],['김철수','2005'],['이영희','88']]);
+    ws['!cols'] = [{wch:14},{wch:12}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '명단');
+    XLSX.writeFile(wb, '명단_양식.xlsx');
+  } else {
+    // 학년제 부서: 해당 부서 학년만 드롭박스로
+    const grades = DEPT_GRADES[currentDept?.name] || ['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1','고2','고3'];
+    const sampleRow = ['홍길동', grades[0]];
+    const ws = XLSX.utils.aoa_to_sheet([['이름','학년'], sampleRow]);
+    ws['!cols'] = [{wch:14},{wch:10}];
+
+    // ★ B열에 학년 드롭박스 데이터 유효성 검사 추가
+    ws['!dataValidations'] = [{
+      sqref: 'B2:B1000',
+      type: 'list',
+      formula1: '"' + grades.join(',') + '"',
+      showDropDown: false,
+      showErrorMessage: true,
+      errorStyle: 'stop',
+      errorTitle: '입력 오류',
+      error: grades.join(', ') + ' 중 하나만 입력 가능합니다',
+      showInputMessage: true,
+      promptTitle: '학년 선택',
+      prompt: '드롭박스에서 학년을 선택하세요'
+    }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '학생목록');
+    XLSX.writeFile(wb, (currentDept?.name||'') + '_학생목록_양식.xlsx');
+  }
+}
+
+// ── 관리자 ───────────────────────────────────────────────────
+function checkPw(){
+  const pw=document.getElementById('pw-inp').value;
+  const correct=remoteSettings.adminPassword||'1234';
+  if(pw===correct){ closeModal('pw-modal'); goAdmin(); }
+  else{ document.getElementById('pw-err').textContent='비밀번호가 틀렸습니다'; document.getElementById('pw-inp').value=''; document.getElementById('pw-inp').focus(); }
+}
+function goAdmin(){
+  showScreen('s-admin'); window.scrollTo(0,0);
+  document.getElementById('s-name').value        = remoteSettings.appName||'';
+  document.getElementById('s-color-txt').value   = remoteSettings.primaryColor||'#7D3C98';
+  document.getElementById('s-color-pick').value  = remoteSettings.primaryColor||'#7D3C98';
+  document.getElementById('s-worship-time').value= remoteSettings.worshipTime||'';
+  document.getElementById('s-script-url').value  = scriptUrl;
+  document.getElementById('s-url-display').value = window.location.href;
+  document.getElementById('s-pw').value='';
+  previewTime();
+
+  // ★ 부서 유형에 따라 추가 폼 전환
+  const isYear = isDeptYearType();
+  document.getElementById('grade-add-row').style.display = isYear ? 'none' : '';
+  document.getElementById('year-add-row').style.display  = isYear ? '' : 'none';
+
+  // ★ 학년제 부서: 해당 부서에 맞는 학년만 표시
+  if (!isYear) {
+    const grades = DEPT_GRADES[currentDept?.name] || ['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1','고2','고3'];
+    const sel = document.getElementById('new-grade');
+    sel.innerHTML = '<option value="">학년 선택</option>';
+    grades.forEach(g => {
+      const o = document.createElement('option');
+      o.value = g; o.textContent = g;
+      sel.appendChild(o);
+    });
+  }
+
+  // ★ 엑셀 설명 문구 변경
+  const desc = document.getElementById('excel-desc');
+  if(desc) desc.innerHTML = isYear
+    ? '<b>A열: 이름 / B열: 출생연도</b> (예: 92, 2005) 형식의 엑셀 파일을 업로드하세요.'
+    : '<b>A열: 이름 / B열: 학년</b> 형식의 엑셀 파일을 업로드하세요.';
+}
+function goMain(){ showScreen('s-main'); window.scrollTo(0,0); }
+function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function onPickerChange(){ document.getElementById('s-color-txt').value=document.getElementById('s-color-pick').value; }
+document.getElementById('s-color-txt').addEventListener('input',function(){ if(/^#[0-9A-Fa-f]{6}$/.test(this.value)) document.getElementById('s-color-pick').value=this.value; });
+function copyShareUrl(){ const u=window.location.href; navigator.clipboard.writeText(u).then(()=>showToast('링크 복사 완료 ✓')).catch(()=>prompt('아래 링크를 복사하세요:',u)); }
+
+// ── 유틸 ─────────────────────────────────────────────────────
+function openModal(id){  document.getElementById(id).classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function setLoading(show,msg){ if(msg) document.getElementById('load-txt').textContent=msg; document.getElementById('loading').className='load-ov'+(show?' show':''); }
+let toastTimer=null;
+function showToast(msg,dur){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); if(toastTimer) clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),dur||2800); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function changeDept(){
+  goMain();
+  setTimeout(()=>goToDeptSelect(), 100);
+}
+document.querySelectorAll('.overlay').forEach(el=>el.addEventListener('click',e=>{ if(e.target===el) el.classList.remove('show'); }));
+// 부서 관리 오버레이 바깥 탭으로 닫기
+document.getElementById('dept-admin-overlay').addEventListener('click',function(e){ if(e.target===this) this.classList.remove('show'); });
+</script>
+</body>
+</html>
