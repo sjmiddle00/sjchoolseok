@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>서부제일 교육부 출석체크</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -32,6 +33,10 @@ const DEPARTMENTS = [
 // 부서 선택 화면 관리자 비밀번호 (부서 활성화/비활성화 용)
 // ★ 배포 전 원하는 비밀번호로 변경하세요
 const DEPT_ADMIN_PW = '0691';
+
+// ★ 옵저버 스프레드시트 GAS URL (보고자료 통합 전송용)
+// 옵저버 스프레드시트를 만들고 observer.gs를 배포한 후 URL을 입력하세요
+const OBSERVER_URL = 'https://script.google.com/macros/s/AKfycbx-3bbgFU4lpvt4AlrRJtxadgV9iBapvQfXn7WRqUCaOLnQh1dSr4yIzuhqDna8DsL_Gw/exec';
 
 // ★ 부서별 학년 목록 (학년제 부서만 해당)
 const DEPT_GRADES = {
@@ -179,6 +184,8 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .inp,.grade-inp{padding:12px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7;color:var(--txt);min-width:0;}
 .inp:focus,.grade-inp:focus{outline:none;border-color:var(--pr);background:#fff;}
 .grade-inp{width:120px;min-width:80px;appearance:none;cursor:pointer;padding-right:8px;flex-shrink:1;}
+.gender-sel{width:68px;min-width:56px;flex-shrink:0;padding:12px 4px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7;color:var(--txt);appearance:none;cursor:pointer;text-align:center;}
+.gender-sel:focus{outline:none;border-color:var(--pr);background:#fff;}
 .name-inp{flex:1;min-width:80px;}.add-btn{padding:12px 16px;background:var(--pr);color:#fff;border:none;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;}
 .excel-desc{font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:12px;}
 .excel-desc b{color:var(--txt);}
@@ -220,6 +227,63 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .color-wrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .color-wrap .sett-inp{flex:1;min-width:120px;}
 .color-pick{width:48px;height:44px;border:1.5px solid var(--bdr);border-radius:var(--r);padding:4px;cursor:pointer;background:#f7f7f7;flex-shrink:0;}
+/* ── 드럼 피커 (iOS 스타일 날짜·시간 선택기) ─────────────────── */
+.dp-wrap{display:flex;align-items:center;justify-content:center;gap:2px;background:var(--card);border-radius:var(--R);padding:8px 8px;box-shadow:0 2px 14px rgba(0,0,0,.07);}
+.dp-group{display:flex;align-items:center;gap:3px;}
+.dp-col{position:relative;width:56px;height:90px;overflow:hidden;cursor:grab;-webkit-user-select:none;user-select:none;}
+.dp-col:active{cursor:grabbing;}
+.dp-list{position:absolute;top:0;left:0;width:100%;will-change:transform;z-index:2;}
+.dp-item{height:30px;display:flex;align-items:center;justify-content:center;transition:font-size .12s,opacity .12s,color .12s;font-size:12px;color:var(--muted);font-weight:400;}
+.dp-pad{pointer-events:none;}
+.dp-fade-t{position:absolute;top:0;left:0;right:0;height:30px;background:linear-gradient(to bottom,rgba(255,255,255,.96) 0%,rgba(255,255,255,0) 100%);pointer-events:none;z-index:3;}
+.dp-fade-b{position:absolute;bottom:0;left:0;right:0;height:30px;background:linear-gradient(to top,rgba(255,255,255,.96) 0%,rgba(255,255,255,0) 100%);pointer-events:none;z-index:3;}
+.dp-sel{position:absolute;top:30px;left:3px;right:3px;height:30px;border-top:2px solid var(--pr);border-bottom:2px solid var(--pr);border-radius:4px;background:var(--pr-pl);pointer-events:none;z-index:1;}
+.dp-unit{font-size:13px;font-weight:700;color:var(--muted);padding:0 2px;flex-shrink:0;}
+.dp-colon{font-size:17px;font-weight:700;color:var(--muted);padding:0 2px;flex-shrink:0;}
+.dp-caption{text-align:center;font-size:13px;color:var(--muted);margin-top:6px;}
+.wt-clear-btn{width:100%;margin-top:8px;padding:8px;background:#fdedec;color:var(--rd-fg);border:1.5px solid #f5c6c2;border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;}
+.wt-clear-btn:active{opacity:.75;}
+.dp-group-disabled{opacity:.3;pointer-events:none;}
+/* ── 출석 인원 보고 ──────────────────────────────────────────── */
+.rpt-stat-row{display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid var(--bdr);}
+.rpt-stat-row:last-child{border-bottom:none;}
+.rpt-stat-lbl{font-size:16px;font-weight:600;color:var(--txt);flex:1;}
+.rpt-sub{font-size:12px;color:var(--muted);font-weight:400;margin-left:2px;}
+.rpt-stat-val{font-size:26px;font-weight:700;color:var(--pr-dk);min-width:44px;text-align:right;}
+.rpt-stat-unit{font-size:14px;color:var(--muted);margin-left:4px;}
+.rpt-stat-note{font-size:11px;color:var(--muted);text-align:center;padding:8px 0 4px;}
+.rpt-visitor-sec{padding:12px 16px;border-top:1px solid var(--bdr);}
+.rpt-visitor-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.rpt-add-btn{padding:5px 14px;background:var(--pr-pl);color:var(--pr-dk);border:1.5px solid var(--pr);border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;}
+.rpt-add-btn:active{opacity:.8;}
+.rpt-visitor-row{display:flex;gap:6px;align-items:center;margin-bottom:7px;}
+.rpt-vinp{flex:1;padding:10px 11px;font-size:14px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7;color:var(--txt);min-width:0;}
+.rpt-vinp:focus{outline:none;border-color:var(--pr);background:#fff;}
+.rpt-vinp.sm{flex:0 0 86px;}
+.rpt-vdel{width:30px;height:30px;background:var(--rd-bg);color:var(--rd-fg);border:none;border-radius:50%;font-size:15px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.rpt-vdel:active{opacity:.75;}
+/* 임시저장 바 */
+.rpt-draft-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#eaf4fb;border-bottom:1px solid #aed6f1;gap:8px;}
+.rpt-draft-info{font-size:12px;color:#1a5276;flex:1;line-height:1.4;}
+.rpt-save-btn{padding:7px 14px;background:#1a5276;color:#fff;border:none;border-radius:var(--r);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.rpt-save-btn:active{opacity:.8;}
+.rpt-load-btn{padding:7px 14px;background:#fff;color:#1a5276;border:1.5px solid #1a5276;border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.rpt-load-btn:active{opacity:.8;}
+.rpt-event-card{padding:14px;border-bottom:1px solid var(--bdr);}
+.rpt-event-card:last-child{border-bottom:none;}
+.rpt-event-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.rpt-event-label{font-size:13px;font-weight:700;color:var(--pr-dk);}
+.rpt-event-grid{display:flex;flex-direction:column;gap:7px;}
+.rpt-event-row{display:flex;align-items:center;gap:8px;}
+.rpt-event-key{font-size:13px;font-weight:600;color:var(--muted);width:52px;flex-shrink:0;}
+.rpt-event-inp{flex:1;padding:9px 11px;font-size:14px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7;color:var(--txt);min-width:0;}
+.rpt-event-inp:focus{outline:none;border-color:var(--pr);background:#fff;}
+/* 건의사항 카드 */
+.rpt-sug-card{padding:12px 14px;border-bottom:1px solid var(--bdr);display:flex;gap:8px;align-items:flex-start;}
+.rpt-sug-card:last-child{border-bottom:none;}
+.rpt-sug-inp{flex:1;padding:10px 11px;font-size:14px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7;color:var(--txt);min-width:0;resize:none;line-height:1.5;}
+.rpt-sug-inp:focus{outline:none;border-color:var(--pr);background:#fff;}
+
 .time-wrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .time-wrap .sett-inp{flex:1;min-width:120px;}
 .time-preview{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:var(--r);font-size:12px;font-weight:600;}
@@ -237,6 +301,13 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .modal{background:#fff;border-radius:var(--R);padding:26px 22px;width:100%;max-width:340px;box-shadow:0 24px 60px rgba(0,0,0,.25);}
 .modal h3{font-size:19px;font-weight:700;text-align:center;margin-bottom:6px;}
 .modal .mbody{font-size:14px;color:var(--muted);text-align:center;line-height:1.7;margin-bottom:18px;}
+/* 이미지 미리보기 오버레이 */
+.img-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:300;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:16px;}
+.img-overlay.show{display:flex;}
+.img-overlay img{max-width:100%;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.4);}
+.img-overlay-btns{display:flex;gap:10px;margin-top:12px;margin-bottom:20px;}
+.img-close-btn{padding:10px 20px;background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.4);border-radius:var(--r);font-size:14px;font-weight:600;cursor:pointer;}
+.img-share-btn{padding:10px 20px;background:#fff;color:#1a1a1a;border:none;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;}
 .modal .mname{font-size:17px;font-weight:700;color:var(--txt);text-align:center;margin-bottom:14px;}
 .mbtn{width:100%;padding:14px;font-size:16px;font-weight:700;border:none;border-radius:var(--r);cursor:pointer;margin-top:8px;}
 .mbtn-p{background:var(--pr);color:#fff;}.mbtn-s{background:#f0f0f0;color:var(--txt);}
@@ -369,6 +440,11 @@ select, input, button { min-width: 0; box-sizing: border-box; }
           <option>중1</option><option>중2</option><option>중3</option>
           <option>고1</option><option>고2</option><option>고3</option>
         </select>
+        <select class="gender-sel" id="new-gender-grade">
+          <option value="">성별</option>
+          <option value="남">남</option>
+          <option value="여">여</option>
+        </select>
         <input class="inp name-inp" id="new-name" type="text" placeholder="이름 입력"
                onkeydown="if(event.key==='Enter')addStudent()"/>
         <button class="add-btn" onclick="addStudent()">추가</button>
@@ -378,6 +454,11 @@ select, input, button { min-width: 0; box-sizing: border-box; }
         <input class="inp" id="new-year" type="number" placeholder="출생연도 (예: 92)"
                style="width:130px;min-width:80px;flex-shrink:1;flex:0 1 130px" min="1" max="2099"
                onkeydown="if(event.key==='Enter')addStudent()"/>
+        <select class="gender-sel" id="new-gender-year">
+          <option value="">성별</option>
+          <option value="남">남</option>
+          <option value="여">여</option>
+        </select>
         <input class="inp name-inp" id="new-name-year" type="text" placeholder="이름 입력"
                onkeydown="if(event.key==='Enter')addStudent()"/>
         <button class="add-btn" onclick="addStudent()">추가</button>
@@ -388,7 +469,7 @@ select, input, button { min-width: 0; box-sizing: border-box; }
   <div class="adm-sec">
     <div class="adm-sec-ttl">엑셀 일괄 등록</div>
     <div class="card">
-      <p class="excel-desc" id="excel-desc"><b>A열: 이름 / B열: 학년</b> 형식의 엑셀 파일을 업로드하세요.</p>
+      <p class="excel-desc" id="excel-desc"><b>A열: 이름 / B열: 학년 / C열: 성별</b> 형식의 엑셀 파일을 업로드하세요.</p>
       <div class="excel-btns">
         <label class="excel-select-btn" for="excel-file">📂 엑셀 파일 선택</label>
         <button class="excel-tpl-btn" onclick="downloadTemplate()">📋 샘플 양식</button>
@@ -458,11 +539,23 @@ select, input, button { min-width: 0; box-sizing: border-box; }
         <div class="sett-lbl">예배 시작 시간 ⏰
           <span style="font-size:11px;font-weight:400;color:var(--muted)"> · 이 시간 전=출석만, 이후=지각만</span>
         </div>
-        <div class="time-wrap">
-          <input class="sett-inp" id="s-worship-time" type="time" placeholder="09:30" oninput="previewTime()"/>
-          <div class="time-preview" id="time-preview"></div>
+        <div class="dp-wrap" style="justify-content:flex-start;gap:8px;margin-bottom:6px;">
+          <div class="dp-group">
+            <div class="dp-col" id="dp-wap" style="width:62px;"></div>
+          </div>
+          <div class="dp-group">
+            <div class="dp-col" id="dp-wth"></div>
+            <div class="dp-unit">시</div>
+          </div>
+          <div class="dp-colon">:</div>
+          <div class="dp-group">
+            <div class="dp-col" id="dp-wtm"></div>
+            <div class="dp-unit">분</div>
+          </div>
+          <div class="time-preview" id="time-preview" style="align-self:center;margin-left:8px;"></div>
         </div>
-        <div class="sett-sub">비워두면 시간 제한 없이 출석·지각 모두 선택 가능합니다.</div>
+        <button class="wt-clear-btn" onclick="clearWt()">✕ 시간 제한 해제</button>
+        <div class="sett-sub" id="wt-status-txt"></div>
       </div>
 
       <div class="divider"></div>
@@ -479,8 +572,181 @@ select, input, button { min-width: 0; box-sizing: border-box; }
       </div>
 
       <button class="save-sett" onclick="saveSettings()">💾 설정 저장</button>
-      <button class="change-dept-btn" onclick="changeDept()">🏛 부서 변경하기</button>
+      <button class="change-dept-btn" onclick="goReport()" style="background:#e8f4fd;color:#1a5276;border-color:#aed6f1;">📋 보고자료 생성하기</button>
     </div>
+  </div>
+</div>
+
+<!-- ════════════ 보고자료 화면 ════════════ -->
+<div id="s-report" class="screen">
+  <div class="adm-hdr" style="background:#1a5276;">
+    <button class="back-btn" onclick="goMain()">←</button>
+    <h2>📋 보고자료 생성 <span id="report-dept-label" style="font-size:14px;opacity:.7"></span></h2>
+  </div>
+  <!-- 임시저장 바 -->
+  <div class="rpt-draft-bar">
+    <div class="rpt-draft-info" id="rpt-draft-info">💾 임시저장된 데이터 없음</div>
+    <button class="rpt-load-btn" onclick="loadReportDraft()">불러오기</button>
+    <button class="rpt-save-btn" onclick="saveReportDraft()">임시저장</button>
+  </div>
+  <!-- 이후 보고자료 구성 요소를 여기에 추가해 나갑니다 -->
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">보고 일자 선택</div>
+    <div class="card" style="margin:0;padding:10px 8px;">
+      <div class="dp-wrap" style="margin:0;padding:0;box-shadow:none;background:none;border-radius:0;">
+        <div class="dp-group">
+          <div class="dp-col" id="dp-year"></div>
+          <div class="dp-unit">년</div>
+        </div>
+        <div class="dp-group">
+          <div class="dp-col" id="dp-month"></div>
+          <div class="dp-unit">월</div>
+        </div>
+        <div class="dp-group">
+          <div class="dp-col" id="dp-day"></div>
+          <div class="dp-unit">일</div>
+        </div>
+      </div>
+      <div class="dp-caption" id="rpt-date-caption"></div>
+    </div>
+  </div>
+
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">설교 본문</div>
+    <div class="card" style="margin:0;padding:14px;">
+      <!-- 성경 책 드럼 -->
+      <div style="display:flex;justify-content:center;margin-bottom:10px;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <div class="dp-col" id="dp-bk" style="width:118px;"></div>
+          <div class="dp-unit">성경</div>
+        </div>
+      </div>
+      <!-- 장 / 절 드럼 -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;">
+        <div class="dp-group">
+          <div class="dp-col" id="dp-ch"></div>
+          <div class="dp-unit">장</div>
+        </div>
+        <div class="dp-group">
+          <div class="dp-col" id="dp-v1"></div>
+          <div class="dp-unit">절</div>
+        </div>
+        <div style="font-size:17px;font-weight:700;color:var(--muted);padding:0 2px;align-self:center;">~</div>
+        <div class="dp-group">
+          <div class="dp-col" id="dp-v2"></div>
+          <div class="dp-unit">절</div>
+        </div>
+      </div>
+      <div style="text-align:center;font-size:14px;font-weight:600;color:var(--pr-dk);margin-top:10px;min-height:20px;" id="bible-caption"></div>
+    </div>
+  </div>
+
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">설교제목 · 대표기도자</div>
+    <div class="card" style="margin:0;padding:14px;display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:15px;font-weight:600;color:var(--txt);width:80px;flex-shrink:0;">설교제목</span>
+        <input class="sett-inp" id="rpt-sermon" type="text" placeholder="제목 입력" style="flex:1;padding:10px 12px;font-size:15px;"/>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:15px;font-weight:600;color:var(--txt);width:80px;flex-shrink:0;">대표기도자</span>
+        <input class="sett-inp" id="rpt-prayer" type="text" placeholder="이름 입력" style="flex:1;padding:10px 12px;font-size:15px;"/>
+      </div>
+    </div>
+  </div>
+
+  <div class="adm-sec" style="margin-bottom:40px;">
+    <div class="adm-sec-ttl">출석 인원 현황</div>
+    <div class="card" style="margin:0;padding:0;overflow:hidden;">
+      <!-- 자동 집계 항목 -->
+      <div class="rpt-stat-row">
+        <span class="rpt-stat-lbl">재적</span>
+        <span class="rpt-stat-val" id="rpt-roster">-</span>
+        <span class="rpt-stat-unit">명</span>
+      </div>
+      <div class="rpt-stat-row">
+        <span class="rpt-stat-lbl">출석</span>
+        <span class="rpt-stat-val" id="rpt-attend">-</span>
+        <span class="rpt-stat-unit">명</span>
+      </div>
+      <div class="rpt-stat-row">
+        <span class="rpt-stat-lbl">남<span class="rpt-sub">(재적)</span></span>
+        <span class="rpt-stat-val" id="rpt-m-attend">-</span>
+        <span class="rpt-stat-unit">명</span>
+      </div>
+      <div class="rpt-stat-row">
+        <span class="rpt-stat-lbl">여<span class="rpt-sub">(재적)</span></span>
+        <span class="rpt-stat-val" id="rpt-f-attend">-</span>
+        <span class="rpt-stat-unit">명</span>
+      </div>
+      <div class="rpt-stat-note" id="rpt-stat-note">오늘 출석체크 데이터 기준</div>
+      <!-- 남(방문) -->
+      <div class="rpt-visitor-sec">
+        <div class="rpt-visitor-hdr">
+          <span class="rpt-stat-lbl" style="font-size:15px;">남<span class="rpt-sub">(방문)</span></span>
+          <button class="rpt-add-btn" onclick="addVisitor('m')">＋ 추가</button>
+        </div>
+        <div id="rpt-visitors-m"></div>
+      </div>
+      <!-- 여(방문) -->
+      <div class="rpt-visitor-sec">
+        <div class="rpt-visitor-hdr">
+          <span class="rpt-stat-lbl" style="font-size:15px;">여<span class="rpt-sub">(방문)</span></span>
+          <button class="rpt-add-btn" onclick="addVisitor('f')">＋ 추가</button>
+        </div>
+        <div id="rpt-visitors-f"></div>
+      </div>
+      <!-- 교사 출석 -->
+      <div class="rpt-stat-row">
+        <span class="rpt-stat-lbl">교사 출석</span>
+        <input type="number" id="rpt-teacher-attend" min="0" value="0"
+               style="width:64px;padding:6px 10px;font-size:22px;font-weight:700;color:var(--pr-dk);border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7;text-align:right;"/>
+        <span class="rpt-stat-unit">명</span>
+      </div>
+      <!-- 교사 결석 -->
+      <div class="rpt-visitor-sec" style="border-top:1px solid var(--bdr);">
+        <div class="rpt-visitor-hdr">
+          <span class="rpt-stat-lbl" style="font-size:15px;">교사 결석</span>
+          <button class="rpt-add-btn" onclick="addAbsTeacher()">＋ 추가</button>
+        </div>
+        <div id="rpt-abs-teachers"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 금주 및 다음 주 행사 보고 -->
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">금주 및 다음 주 행사 보고</div>
+    <div class="adm-sec-ttl" style="font-size:10px;font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0;margin-top:-6px;">2부 순서 및 주중행사</div>
+    <div class="card" style="margin:0;padding:0;overflow:hidden;">
+      <div id="rpt-events"></div>
+      <div style="padding:10px 14px;">
+        <button class="rpt-add-btn" style="width:100%;" onclick="addEvent()">＋ 행사 추가</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 협조 및 건의사항 -->
+  <div class="adm-sec" style="margin-bottom:40px;">
+    <div class="adm-sec-ttl">협조 및 건의사항</div>
+    <div class="card" style="margin:0;padding:0;overflow:hidden;">
+      <div id="rpt-suggestions"></div>
+      <div style="padding:10px 14px;">
+        <button class="rpt-add-btn" style="width:100%;" onclick="addSuggestion()">＋ 항목 추가</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 보고자료 전송 + 이미지 다운로드 -->
+  <div class="adm-sec" style="margin-bottom:60px;display:flex;flex-direction:column;gap:10px;">
+    <button onclick="submitReportToObserver()"
+      style="width:100%;padding:18px;font-size:17px;font-weight:700;background:#1a7a41;color:#fff;border:none;border-radius:var(--R);cursor:pointer;box-shadow:0 4px 18px rgba(26,122,65,.3);">
+      📤 보고자료 전송
+    </button>
+    <button onclick="generateReportImage()"
+      style="width:100%;padding:18px;font-size:17px;font-weight:700;background:#1a5276;color:#fff;border:none;border-radius:var(--R);cursor:pointer;box-shadow:0 4px 18px rgba(26,82,118,.3);">
+      📥 보고서 이미지 다운로드
+    </button>
   </div>
 </div>
 
@@ -538,6 +804,18 @@ select, input, button { min-width: 0; box-sizing: border-box; }
   </div>
 </div>
 
+<!-- 이미지 미리보기 (iOS 대응) -->
+<div class="img-overlay" id="img-overlay">
+  <div style="color:#fff;font-size:13px;margin-bottom:10px;opacity:.8;">
+    📱 이미지를 길게 눌러 저장하세요
+  </div>
+  <img id="img-preview" src="" alt="보고서"/>
+  <div class="img-overlay-btns">
+    <button class="img-close-btn" onclick="closeImgOverlay()">✕ 닫기</button>
+    <button class="img-share-btn" id="img-share-btn" onclick="shareImage()">공유하기 ↗</button>
+  </div>
+</div>
+
 <div class="load-ov" id="loading"><div class="spin"></div><div class="load-txt" id="load-txt">불러오는 중...</div></div>
 <div class="toast" id="toast"></div>
 
@@ -553,6 +831,8 @@ let parsedXlsx     = [];
 let stuSearchQuery = '';
 let stuFilterGrade = '';
 let selectedStuKeys= new Set();
+// ★ 보고자료 날짜 스피너
+// ★ 보고자료 날짜 / 예배시간 → 드럼피커 함수에서 선언
 let refreshTimer   = null;
 let timeTimer      = null;
 
@@ -809,7 +1089,9 @@ async function saveSettings(){
   const name   = document.getElementById('s-name').value.trim();
   const color  = document.getElementById('s-color-txt').value.trim();
   const pw     = document.getElementById('s-pw').value.trim();
-  const wt     = document.getElementById('s-worship-time').value.trim();
+  const wt = wtEnabled
+    ? `${String(to24h(wtAMPM,wtH)).padStart(2,'0')}:${String(wtM).padStart(2,'0')}`
+    : '';
   const newUrl = document.getElementById('s-script-url').value.trim();
 
   if (newUrl){
@@ -839,15 +1121,22 @@ async function saveSettings(){
 
 // 설정 화면 열 때 예배 시간 미리보기
 function previewTime(){
-  const wt = document.getElementById('s-worship-time').value.trim();
-  const el = document.getElementById('time-preview');
-  if (!wt){ el.textContent=''; el.className='time-preview'; return; }
-  const [wh,wm] = wt.split(':').map(Number);
-  const now = new Date();
-  const cur = now.getHours()*60+now.getMinutes();
-  const wor = wh*60+wm;
-  if (cur<=wor){ el.className='time-preview present'; el.textContent='현재: 출석 시간'; }
-  else         { el.className='time-preview late';    el.textContent='현재: 지각 처리'; }
+  const el=document.getElementById('time-preview');
+  const st=document.getElementById('wt-status-txt');
+  if(!wtEnabled){
+    if(el){el.textContent='';el.className='time-preview';}
+    if(st) st.textContent='시간 제한 없음 · 드럼을 돌리면 자동으로 활성화됩니다';
+    return;
+  }
+  const h24=to24h(wtAMPM, wtH);
+  const now=new Date();
+  const cur=now.getHours()*60+now.getMinutes();
+  const wor=h24*60+wtM;
+  if(el){
+    if(cur<=wor){el.className='time-preview present';el.textContent='현재: 출석 시간';}
+    else        {el.className='time-preview late';   el.textContent='현재: 지각 처리';}
+  }
+  if(st) st.textContent=`${wtAMPM} ${wtH}시 ${String(wtM).padStart(2,'0')}분 설정됨`;
 }
 
 // ── 데이터 로드 ───────────────────────────────────────────────
@@ -896,8 +1185,11 @@ function isDeptYearType(){
 
 // 이름 표시: 연도제 부서는 "이름(연도)", 학년제는 "이름"
 function dispName(student){
-  if (isDeptYearType() && student.grade) return `${student.name}(${student.grade})`;
-  return student.name;
+  const g = student.gender || '';
+  if (isDeptYearType() && student.grade) {
+    return g ? `${student.name}(${student.grade}/${g})` : `${student.name}(${student.grade})`;
+  }
+  return g ? `${student.name}(${g})` : student.name;
 }
 
 // ★ 한국어 가나다 정렬 (등록 순서와 무관하게 항상 ㄱ→ㅎ)
@@ -949,23 +1241,23 @@ function updateSubBtn(){
 // ── 출석 제출 (시간에 따라 자동으로 출석/지각 판별) ─────────────
 async function doSubmit(){
   const name = document.getElementById('name-sel').value;
-  const grade = (students.find(s=>s.name===name)||{}).grade||'';
+  const found = students.find(s=>s.name===name) || {};
+  const grade = found.grade || '';
+  const gender = found.gender || '';
   if (!name) return;
 
-  // ★ 버튼은 하나 - 시스템이 시간 보고 자동 판별
   const mode = getAttendanceMode();
   const status = (mode === 'late') ? '지각' : '출석';
 
   setLoading(true,'저장 중...');
   try{
-    const data = await api({action:'submit', name, grade, status});
+    const data = await api({action:'submit', name, grade, gender, status});
     if (data.duplicate){
-      document.getElementById('dup-attend-name').textContent=`${name} (${grade})`;
+      document.getElementById('dup-attend-name').textContent=`${dispName(found)} (${grade})`;
       openModal('dup-attend-modal'); return;
     }
     if (data.error){ showToast('오류: '+data.error); return; }
     setCache(data.records||[]); renderRecords(data.records||[],true);
-    // ★ 아이들에게는 항상 같은 메시지 (지각 여부 노출 안 함)
     showToast(`${name} 출석 완료! 🙌`);
     resetForm();
   }catch(e){ showToast('연결 오류: '+e.message, 4000); }
@@ -997,20 +1289,22 @@ async function addStudent(){
   const rawGrade = isYear
     ? String(document.getElementById('new-year').value).trim()
     : document.getElementById('new-grade').value;
-  // ★ 연도제 부서는 입력값 자동 정규화
-  const grade = isYear ? normalizeYear(rawGrade) : rawGrade;
+  const grade  = isYear ? normalizeYear(rawGrade) : rawGrade;
+  const gender = isYear
+    ? document.getElementById('new-gender-year').value
+    : document.getElementById('new-gender-grade').value;
 
   if (!name){ showToast('이름을 입력해주세요'); return; }
   if (!grade){ showToast(isYear ? '출생연도를 입력해주세요' : '학년을 선택해주세요'); return; }
 
   setLoading(true,'추가 중...');
   try{
-    const data=await api({action:'addStudent',name,grade});
+    const data=await api({action:'addStudent', name, grade, gender});
     if(data.duplicate){ document.getElementById('dup-student-name').textContent=`${name} (${grade})`; openModal('dup-student-modal'); return; }
     if(data.error){showToast('오류: '+data.error);return;}
     students=data.students||[]; renderStudentList(); buildGradeFilter();
-    if(isYear){ document.getElementById('new-name-year').value=''; document.getElementById('new-year').value=''; }
-    else      { document.getElementById('new-name').value=''; document.getElementById('new-grade').value=''; }
+    if(isYear){ document.getElementById('new-name-year').value=''; document.getElementById('new-year').value=''; document.getElementById('new-gender-year').value=''; }
+    else      { document.getElementById('new-name').value=''; document.getElementById('new-grade').value=''; document.getElementById('new-gender-grade').value=''; }
     showToast(`${name} 추가 완료 ✓`);
   }catch(e){showToast('연결 오류: '+e.message);}
   finally{setLoading(false);}
@@ -1091,7 +1385,7 @@ function renderStudentList(){
                onclick="event.stopPropagation();toggleStuSelect(this.closest('.stu-item').dataset.key)"/>
         <div>
           <div class="stu-name">${esc(s.name)}</div>
-          <span class="stu-grade">${isDeptYearType()?(s.grade+'년생'):esc(s.grade)}</span>
+          <span class="stu-grade">${isDeptYearType()?(s.grade+'년생'):esc(s.grade)}${s.gender?' · '+esc(s.gender):''}</span>
         </div>
       </div>
     </div>`;
@@ -1160,11 +1454,13 @@ function onExcelFile(event){
       parsedXlsx=[];
       for(let i=start;i<rows.length;i++){
         const name=String(rows[i][0]||'').trim();
-        // ★ 연도제 부서면 B열 값을 자동 정규화
         const rawGrade=String(rows[i][1]||'').trim();
         const grade = isDeptYearType() ? normalizeYear(rawGrade) : (rawGrade||'미지정');
+        // ★ C열에서 성별 읽기 (남/여, 남자/여자 모두 허용)
+        const rawGender=String(rows[i][2]||'').trim();
+        const gender = rawGender.startsWith('남') ? '남' : rawGender.startsWith('여') ? '여' : '';
         if(!name) continue;
-        parsedXlsx.push({name,grade,dup:existSet.has(`${name}__${grade}`)});
+        parsedXlsx.push({name, grade, gender, dup:existSet.has(`${name}__${grade}`)});
       }
       showExcelPreview();
     }catch(err){showToast('파일 읽기 오류: '+err.message);}
@@ -1176,7 +1472,11 @@ function showExcelPreview(){
   if(!parsedXlsx.length){preview.style.display='block';plist.innerHTML='<div style="padding:12px;font-size:13px;color:var(--rd-fg)">데이터를 찾을 수 없습니다.</div>';btn.style.display='none';return;}
   const newCount=parsedXlsx.filter(s=>!s.dup).length;
   document.getElementById('preview-count').textContent=`총 ${parsedXlsx.length}명 (신규 ${newCount}명)`;
-  plist.innerHTML=parsedXlsx.map(s=>`<div class="excel-preview-row ${s.dup?'dup':''}"><span class="pr-name">${esc(s.name)}</span><span class="pr-grade">${esc(s.grade)}${s.dup?' ✓':''}</span></div>`).join('');
+  plist.innerHTML=parsedXlsx.map(s=>`
+    <div class="excel-preview-row ${s.dup?'dup':''}">
+      <span class="pr-name">${esc(s.name)}</span>
+      <span class="pr-grade">${esc(s.grade)}${s.gender?' · '+esc(s.gender):''}${s.dup?' ✓':''}</span>
+    </div>`).join('');
   preview.style.display='block';
   if(newCount>0){btn.style.display='block';btn.textContent=`신규 ${newCount}명 일괄 등록하기`;}
   else{btn.style.display='none';showToast('모두 이미 등록된 학생입니다');}
@@ -1185,7 +1485,8 @@ async function uploadExcel(){
   const toAdd=parsedXlsx.filter(s=>!s.dup); if(!toAdd.length) return;
   setLoading(true,`${toAdd.length}명 일괄 등록 중...`);
   try{
-    const data=await api({action:'bulkAddStudents',students:JSON.stringify(toAdd.map(s=>({name:s.name,grade:s.grade})))});
+    // ★ gender 포함하여 전송
+    const data=await api({action:'bulkAddStudents', students:JSON.stringify(toAdd.map(s=>({name:s.name,grade:s.grade,gender:s.gender||''})))});
     if(data.error){showToast('오류: '+data.error);return;}
     students=data.students||[]; renderStudentList(); buildGradeFilter();
     showToast(`완료: ${(data.added||[]).length}명 추가`);
@@ -1197,39 +1498,33 @@ async function uploadExcel(){
 }
 function downloadTemplate(){
   const isYear = isDeptYearType();
+  // 성별 드롭박스 유효성 검사 공통
+  const genderDV = {
+    sqref: 'C2:C1000', type: 'list', formula1: '"남,여"',
+    showDropDown: false, showErrorMessage: true, errorStyle: 'stop',
+    errorTitle: '입력 오류', error: '남 또는 여만 입력 가능합니다'
+  };
 
   if (isYear) {
-    // 연도제 부서: 출생연도 양식
-    const ws = XLSX.utils.aoa_to_sheet([['이름','출생연도'],['홍길동','92'],['김철수','2005'],['이영희','88']]);
-    ws['!cols'] = [{wch:14},{wch:12}];
+    const ws = XLSX.utils.aoa_to_sheet([['이름','출생연도','성별'],['홍길동','92','남'],['김영희','2005','여']]);
+    ws['!cols'] = [{wch:14},{wch:12},{wch:8}];
+    ws['!dataValidations'] = [genderDV];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '명단');
-    XLSX.writeFile(wb, '명단_양식.xlsx');
+    XLSX.writeFile(wb, (currentDept?.name||'')+'_명단_양식.xlsx');
   } else {
-    // 학년제 부서: 해당 부서 학년만 드롭박스로
     const grades = DEPT_GRADES[currentDept?.name] || ['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1','고2','고3'];
-    const sampleRow = ['홍길동', grades[0]];
-    const ws = XLSX.utils.aoa_to_sheet([['이름','학년'], sampleRow]);
-    ws['!cols'] = [{wch:14},{wch:10}];
-
-    // ★ B열에 학년 드롭박스 데이터 유효성 검사 추가
-    ws['!dataValidations'] = [{
-      sqref: 'B2:B1000',
-      type: 'list',
-      formula1: '"' + grades.join(',') + '"',
-      showDropDown: false,
-      showErrorMessage: true,
-      errorStyle: 'stop',
-      errorTitle: '입력 오류',
-      error: grades.join(', ') + ' 중 하나만 입력 가능합니다',
-      showInputMessage: true,
-      promptTitle: '학년 선택',
-      prompt: '드롭박스에서 학년을 선택하세요'
-    }];
-
+    const ws = XLSX.utils.aoa_to_sheet([['이름','학년','성별'],['홍길동', grades[0], '남']]);
+    ws['!cols'] = [{wch:14},{wch:10},{wch:8}];
+    ws['!dataValidations'] = [
+      { sqref:'B2:B1000', type:'list', formula1:'"'+grades.join(',') + '"',
+        showDropDown:false, showErrorMessage:true, errorStyle:'stop',
+        errorTitle:'입력 오류', error:grades.join(', ')+' 중 하나만 입력 가능합니다' },
+      genderDV
+    ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '학생목록');
-    XLSX.writeFile(wb, (currentDept?.name||'') + '_학생목록_양식.xlsx');
+    XLSX.writeFile(wb, (currentDept?.name||'')+'_학생목록_양식.xlsx');
   }
 }
 
@@ -1245,7 +1540,18 @@ function goAdmin(){
   document.getElementById('s-name').value        = remoteSettings.appName||'';
   document.getElementById('s-color-txt').value   = remoteSettings.primaryColor||'#7D3C98';
   document.getElementById('s-color-pick').value  = remoteSettings.primaryColor||'#7D3C98';
-  document.getElementById('s-worship-time').value= remoteSettings.worshipTime||'';
+  // ★ 예배 시간 드럼 초기화
+  const savedWt = (remoteSettings.worshipTime || '').trim();
+  if (savedWt && savedWt.includes(':')) {
+    const [ph, pm] = savedWt.split(':').map(Number);
+    const parsed = from24h(ph);
+    wtH = parsed.h; wtAMPM = parsed.ampm;
+    wtM = (pm >= 0 && pm <= 59) ? pm : 0;
+    wtEnabled = true;
+  } else {
+    wtH = 9; wtM = 0; wtAMPM = '오전'; wtEnabled = false;
+  }
+  setTimeout(initWtDrums, 50);
   document.getElementById('s-script-url').value  = scriptUrl;
   document.getElementById('s-url-display').value = window.location.href;
   document.getElementById('s-pw').value='';
@@ -1282,10 +1588,841 @@ function goAdmin(){
   // ★ 엑셀 설명 문구 변경
   const desc = document.getElementById('excel-desc');
   if(desc) desc.innerHTML = isYear
-    ? '<b>A열: 이름 / B열: 출생연도</b> (예: 92, 2005) 형식의 엑셀 파일을 업로드하세요.'
-    : '<b>A열: 이름 / B열: 학년</b> 형식의 엑셀 파일을 업로드하세요.';
+    ? '<b>A열: 이름 / B열: 출생연도 / C열: 성별</b> (예: 92, 2005) 형식의 엑셀 파일을 업로드하세요.'
+    : '<b>A열: 이름 / B열: 학년 / C열: 성별</b> 형식의 엑셀 파일을 업로드하세요.';
 }
 function goMain(){ showScreen('s-main'); window.scrollTo(0,0); }
+
+// ══════════════════════════════════════════════════════════════
+// ★ 드럼 피커 엔진 (iOS 휠 스타일)
+// ══════════════════════════════════════════════════════════════
+const DP_H    = 30;   // 아이템 높이(px)
+const DP_PAD  = 1;    // 위아래 여백 아이템 수 → 총 3개 표시
+
+function getDaysInMonth(y,m){ return new Date(y,m,0).getDate(); }
+
+function createDrum(colId, items, initVal, onChange, opts){
+  const col = document.getElementById(colId);
+  if(!col) return null;
+  let its = [...items];
+  let idx = Math.max(0, its.indexOf(initVal));
+  let sy=0, so=0, dragging=false;
+
+  function build(){
+    col.innerHTML=`<div class="dp-list" id="${colId}-L"></div>
+      <div class="dp-fade-t"></div><div class="dp-fade-b"></div>
+      <div class="dp-sel"></div>`;
+    renderList();
+    moveTo(idx, false);
+    paint();
+  }
+  function list(){ return document.getElementById(colId+'-L'); }
+  function renderList(){
+    const pads='<div class="dp-item dp-pad"></div>'.repeat(DP_PAD);
+    list().innerHTML = pads +
+      its.map((v,i)=>`<div class="dp-item" data-i="${i}">${v}</div>`).join('') +
+      pads;
+  }
+  function moveTo(i, anim){
+    idx = Math.max(0, Math.min(i, its.length-1));
+    const L=list(); if(!L) return;
+    L.style.transition = anim ? 'transform .22s cubic-bezier(.25,.8,.25,1)' : 'none';
+    L.style.transform = `translateY(${-idx*DP_H}px)`;
+  }
+  function paint(){
+    col.querySelectorAll('.dp-item:not(.dp-pad)').forEach(el=>{
+      const d=Math.abs(+el.dataset.i - idx);
+      const sf=(opts&&opts.selFs)||'19px', rf=(opts&&opts.regFs)||'12px';
+      el.style.fontSize   = d===0?sf:rf;
+      el.style.fontWeight = d===0?'700':'400';
+      el.style.opacity    = d===0?'1':'0.38';
+      el.style.color      = d===0?'var(--txt)':'var(--muted)';
+    });
+  }
+  function snap(i){ moveTo(i,true); paint(); onChange(its[idx]); }
+
+  function onStart(e){
+    dragging=true;
+    sy = e.touches?e.touches[0].clientY:e.clientY;
+    so = -idx*DP_H;
+    list().style.transition='none';
+    e.preventDefault();
+  }
+  function onMove(e){
+    if(!dragging) return;
+    const cy=e.touches?e.touches[0].clientY:e.clientY;
+    const raw=so+(cy-sy);
+    const mn=-(its.length-1)*DP_H, mx=0;
+    const cl=raw<mn?mn+(raw-mn)*.15:raw>mx?mx+(raw-mx)*.15:raw;
+    list().style.transform=`translateY(${cl}px)`;
+    const ni=Math.max(0,Math.min(Math.round(-raw/DP_H),its.length-1));
+    if(ni!==idx){idx=ni;paint();}
+    e.preventDefault();
+  }
+  function onEnd(){
+    if(!dragging)return; dragging=false; snap(idx);
+  }
+
+  col.addEventListener('touchstart',onStart,{passive:false});
+  col.addEventListener('touchmove', onMove, {passive:false});
+  col.addEventListener('touchend',  onEnd);
+  col.addEventListener('mousedown', onStart);
+  document.addEventListener('mousemove',e=>{if(dragging)onMove(e);});
+  document.addEventListener('mouseup',  e=>{if(dragging)onEnd();});
+
+  build();
+  return {
+    val:   ()=>its[idx],
+    setVal:(v,anim=true)=>{ const i=its.indexOf(v); if(i>=0){moveTo(i,anim);paint();} },
+    setIdx:(i,anim=true)=>{ idx=Math.max(0,Math.min(i,its.length-1)); moveTo(idx,anim); paint(); },
+    reload:(newIts,keepVal=true)=>{
+      const prev=its[idx]; its=[...newIts];
+      const ni=keepVal?Math.max(0,its.indexOf(prev)):0;
+      idx=Math.max(0,Math.min(ni,its.length-1));
+      renderList(); moveTo(idx,false); paint();
+    }
+  };
+}
+
+// ── 보고 날짜 드럼 ────────────────────────────────────────────
+let drumY, drumM, drumD;
+let drumDateReady=false;
+let rptY=new Date().getFullYear(), rptM=new Date().getMonth()+1, rptD=new Date().getDate();
+const RPT_YEAR_MIN=2020, RPT_YEAR_MAX=new Date().getFullYear()+1;
+
+function getDayItems(y,m){
+  return Array.from({length:getDaysInMonth(y,m)},(_,i)=>String(i+1).padStart(2,'0'));
+}
+function updateCaption(){
+  const el=document.getElementById('rpt-date-caption');
+  if(el) el.textContent=`${rptY}년 ${rptM}월 ${rptD}일`;
+}
+function initDateDrums(){
+  const today=new Date();
+  rptY=today.getFullYear(); rptM=today.getMonth()+1; rptD=today.getDate();
+  const years  = Array.from({length:RPT_YEAR_MAX-RPT_YEAR_MIN+1},(_,i)=>String(RPT_YEAR_MIN+i));
+  const months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+  const days   = getDayItems(rptY,rptM);
+
+  if(!drumDateReady){
+    drumDateReady=true;
+    drumY=createDrum('dp-year', years,  String(rptY),                 v=>{ rptY=+v; const di=getDayItems(rptY,rptM); drumD.reload(di); rptD=+drumD.val(); updateCaption(); });
+    drumM=createDrum('dp-month',months, String(rptM).padStart(2,'0'), v=>{ rptM=+v; const di=getDayItems(rptY,rptM); drumD.reload(di); rptD=+drumD.val(); updateCaption(); });
+    drumD=createDrum('dp-day',  days,   String(rptD).padStart(2,'0'), v=>{ rptD=+v; updateCaption(); });
+  } else {
+    drumY.setVal(String(rptY));
+    drumM.setVal(String(rptM).padStart(2,'0'));
+    drumD.reload(getDayItems(rptY,rptM));
+    drumD.setVal(String(rptD).padStart(2,'0'));
+  }
+  updateCaption();
+}
+
+// ── 예배 시간 드럼 ────────────────────────────────────────────
+let drumWH, drumWM, drumWAP;
+let drumWtReady=false;
+let wtH=9, wtM=0, wtAMPM='오전', wtEnabled=false;
+
+// 오전/오후 ↔ 24시간 변환
+function to24h(ampm, h12){
+  if(ampm==='오전') return h12===12 ? 0 : h12;  // 오전12시=자정(0), 오전1-11=1-11
+  else              return h12===12 ? 12 : h12+12; // 오후12시=정오(12), 오후1-11=13-23
+}
+function from24h(h24){
+  if(h24===0)  return {ampm:'오전', h:12};
+  if(h24<12)   return {ampm:'오전', h:h24};
+  if(h24===12) return {ampm:'오후', h:12};
+  return {ampm:'오후', h:h24-12};
+}
+
+function initWtDrums(){
+  const ampms = ['오전','오후'];
+  const hours = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+  const mins  = Array.from({length:60},(_,i)=>String(i).padStart(2,'0'));
+  const initH = String(wtH>=1&&wtH<=12?wtH:9).padStart(2,'0');
+  const initM = String(wtM>=0&&wtM<=59?wtM:0).padStart(2,'0');
+  const initAP = ['오전','오후'].includes(wtAMPM) ? wtAMPM : '오전';
+
+  if(!drumWtReady){
+    drumWtReady=true;
+    drumWAP=createDrum('dp-wap', ampms, initAP, v=>{ wtAMPM=v; wtEnabled=true; setWtDrumsDisabled(false); previewTime(); });
+    drumWH =createDrum('dp-wth', hours, initH,  v=>{ wtH=+v;   wtEnabled=true; setWtDrumsDisabled(false); previewTime(); });
+    drumWM =createDrum('dp-wtm', mins,  initM,  v=>{ wtM=+v;   wtEnabled=true; setWtDrumsDisabled(false); previewTime(); });
+  } else {
+    drumWAP.setVal(initAP);
+    drumWH.setVal(initH);
+    drumWM.setVal(initM);
+  }
+  setWtDrumsDisabled(!wtEnabled);
+  previewTime();
+}
+function clearWt(){
+  wtEnabled=false;
+  setWtDrumsDisabled(true);
+  previewTime();
+}
+function setWtDrumsDisabled(disabled){
+  ['dp-wap','dp-wth','dp-wtm'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.opacity = disabled ? '0.32' : '1';
+    // pointer-events는 항상 auto 유지 (드래그 가능해야 함)
+  });
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// ★ 성경 66권 데이터 (책명 + 각 장의 절 수)
+// ══════════════════════════════════════════════════════════════
+const BIBLE=[
+  // 구약 (Old Testament)
+  {n:'창세기',    v:[31,25,24,26,32,22,24,22,29,32,32,20,18,24,21,16,27,33,38,18,34,24,20,67,34,35,46,22,35,43,55,32,20,31,29,43,36,30,23,23,57,38,34,34,28,34,31,22,33,26]},
+  {n:'출애굽기',  v:[22,25,22,31,23,30,25,32,35,29,10,51,22,31,27,36,16,27,25,26,36,31,33,18,40,37,21,43,46,38,18,35,23,35,35,38,29,31,43,38]},
+  {n:'레위기',    v:[17,16,17,35,19,30,38,36,24,20,47,8,59,57,33,34,16,30,24,33,3,17,17,10,22,29,22]},
+  {n:'민수기',    v:[54,34,51,49,31,27,89,26,23,36,35,16,33,45,41,50,13,32,22,29,35,41,30,25,18,65,23,31,40,16,54,42,56,29,34,13]},
+  {n:'신명기',    v:[46,37,29,49,33,25,26,20,29,22,32,32,18,29,23,22,20,22,21,20,23,30,25,22,19,19,26,68,29,20,30,52,29,12]},
+  {n:'여호수아',  v:[18,24,17,24,15,27,26,35,27,43,23,24,33,15,63,10,18,28,51,9,45,34,16,33]},
+  {n:'사사기',    v:[36,23,31,24,31,40,25,35,57,18,40,15,25,20,20,31,13,31,30,48,25]},
+  {n:'룻기',      v:[22,23,18,22]},
+  {n:'사무엘상',  v:[28,36,21,22,12,21,17,22,27,27,15,25,23,52,35,23,58,30,24,42,15,23,29,22,44,25,12,25,11,31,13]},
+  {n:'사무엘하',  v:[27,32,39,12,25,23,29,18,13,19,27,31,39,33,37,23,29,33,43,26,22,51,39,25]},
+  {n:'열왕기상',  v:[53,46,28,34,18,38,51,66,28,29,43,33,34,31,34,34,24,46,21,43,29,53]},
+  {n:'열왕기하',  v:[18,25,27,44,27,33,20,29,37,36,21,21,25,29,38,20,41,37,37,21,26,20,37,20,30]},
+  {n:'역대상',    v:[54,55,24,43,26,81,40,40,44,14,47,40,14,17,29,43,27,17,19,8,30,19,32,31,31,32,34,21,30]},
+  {n:'역대하',    v:[17,18,17,22,14,42,22,18,31,19,23,16,22,15,19,14,19,34,11,37,20,12,21,27,28,23,9,27,36,27,21,33,25,33,27,23]},
+  {n:'에스라',    v:[11,70,13,24,17,22,28,36,15,44]},
+  {n:'느헤미야',  v:[11,20,32,23,19,19,73,18,38,39,36,47,31]},
+  {n:'에스더',    v:[22,23,15,17,14,14,10,17,32,3]},
+  {n:'욥기',      v:[22,13,26,21,27,30,21,22,35,22,20,25,28,22,35,22,16,21,29,29,34,30,17,25,6,14,23,28,25,31,40,22,33,37,16,33,24,41,30,24,34,17]},
+  {n:'시편',      v:[6,12,8,8,12,10,17,9,20,18,7,8,6,7,5,11,15,50,14,9,13,31,6,10,22,12,14,9,11,12,24,11,22,22,28,12,40,22,13,17,13,11,5,20,28,22,35,22,46,28,14,9,31,22,36,16,33,18,40,15,14,14,10,12,12,11,15,22,9,11,21,22,25,12,12,13,13,14,28,17,18,9,13,20,17,12,12,29,12,29,7,14,12,37,24,14,22,21,14,28,60,10,11,18,26,12,22,22,30,22,7,12,19,23,10,8,27,27,12,5,14,10,12,14,12,6,14,11,11,5,16,12,8,8,22,19,27,14,29,21,26,4,6,17,14,22,17,28,14,30,6,8,25,14,17,5,14,26,11,12,11,12,10,5,14,10,14,21,9,11,7,11,5,9,19,14,13,7,11,6,8,22,16,11,13,12,8,22,5,9,10,7,10,10,6,13,6,7,11,12]},
+  {n:'잠언',      v:[33,22,35,27,23,35,27,36,18,32,31,28,25,35,33,33,28,24,29,30,31,29,35,34,28,28,27,28,27,33,31]},
+  {n:'전도서',    v:[18,26,22,16,20,12,29,17,18,20,10,14]},
+  {n:'아가',      v:[17,17,11,16,16,13,13,14]},
+  {n:'이사야',    v:[31,22,26,6,30,13,25,22,21,34,16,6,22,32,9,14,14,7,25,6,17,25,18,23,12,21,13,29,24,33,9,20,24,21,29,2,22,24,17,22,28,23,23,8,48,16,24,6,36,28,21,33,31,26,15,12,11,11,7,12,14,13,14,18,16,17]},
+  {n:'예레미야',  v:[19,37,25,31,31,30,34,22,26,25,23,17,27,22,21,21,27,23,15,18,14,30,40,10,38,24,22,17,32,24,40,44,26,22,19,32,21,28,18,16,18,22,13,30,5,28,7,47,39,46,64,34]},
+  {n:'예레미야애가',v:[22,22,66,22,22]},
+  {n:'에스겔',    v:[28,10,27,17,17,14,27,18,11,22,25,28,23,23,8,63,24,32,14,49,32,31,49,27,17,21,36,26,21,26,18,32,33,31,15,38,28,23,29,49,26,20,27,31,25,24,23,35]},
+  {n:'다니엘',    v:[21,49,30,37,31,28,28,27,27,21,45,13]},
+  {n:'호세아',    v:[11,23,5,19,15,11,16,14,17,15,12,14,16,9]},
+  {n:'요엘',      v:[20,32,21]},
+  {n:'아모스',    v:[15,16,15,13,27,14,17,14,15]},
+  {n:'오바댜',    v:[21]},
+  {n:'요나',      v:[17,10,10,11]},
+  {n:'미가',      v:[16,13,12,13,15,16,20]},
+  {n:'나훔',      v:[15,13,19]},
+  {n:'하박국',    v:[17,20,19]},
+  {n:'스바냐',    v:[18,15,20]},
+  {n:'학개',      v:[15,23]},
+  {n:'스가랴',    v:[21,13,10,14,11,15,14,23,17,12,17,14,9,21]},
+  {n:'말라기',    v:[14,17,18,6]},
+  // 신약 (New Testament)
+  {n:'마태복음',  v:[25,23,17,25,48,34,29,34,38,42,30,50,58,36,39,28,27,35,30,34,46,46,39,51,46,75,66,20]},
+  {n:'마가복음',  v:[45,28,35,41,43,56,37,38,50,52,33,44,37,72,47,20]},
+  {n:'누가복음',  v:[80,52,38,44,39,49,50,56,62,42,54,59,35,35,32,31,37,43,48,47,38,71,56,53]},
+  {n:'요한복음',  v:[51,25,36,54,47,71,53,59,41,42,57,50,38,31,27,33,26,40,42,31,25]},
+  {n:'사도행전',  v:[26,47,26,37,42,15,60,40,43,48,30,25,52,28,41,40,34,28,40,38,40,30,35,27,27,32,44,31]},
+  {n:'로마서',    v:[32,29,31,25,21,23,25,39,33,21,36,21,14,23,33,27]},
+  {n:'고린도전서',v:[31,16,23,21,13,20,40,13,27,33,34,31,13,40,58,24]},
+  {n:'고린도후서',v:[24,17,18,18,21,18,16,24,15,18,33,21,14]},
+  {n:'갈라디아서',v:[24,21,29,31,26,18]},
+  {n:'에베소서',  v:[23,22,21,28,23,22]},
+  {n:'빌립보서',  v:[30,30,21,23]},
+  {n:'골로새서',  v:[29,23,25,18]},
+  {n:'데살로니가전서',v:[10,20,13,18,28]},
+  {n:'데살로니가후서',v:[12,17,18]},
+  {n:'디모데전서',v:[20,15,16,16,25,21]},
+  {n:'디모데후서',v:[18,26,17,22]},
+  {n:'디도서',    v:[16,15,15]},
+  {n:'빌레몬서',  v:[25]},
+  {n:'히브리서',  v:[14,18,19,16,14,20,28,13,28,39,40,29,25]},
+  {n:'야고보서',  v:[27,26,18,17,20]},
+  {n:'베드로전서',v:[25,25,22,19,14]},
+  {n:'베드로후서',v:[21,22,18]},
+  {n:'요한일서',  v:[10,29,24,21,21]},
+  {n:'요한이서',  v:[13]},
+  {n:'요한삼서',  v:[14]},
+  {n:'유다서',    v:[25]},
+  {n:'요한계시록',v:[20,29,22,11,14,17,17,13,21,11,19,17,18,20,8,21,18,24,21,15,27,21]}
+];
+
+// ── ★ 설교 본문 드럼 ─────────────────────────────────────────
+let drumBk, drumCh, drumV1, drumV2;
+let drumBibleReady=false;
+let rptBook=0, rptChap=0, rptVs1=0, rptVs2='';
+
+function getBkItems(){ return BIBLE.map(b=>b.n); }
+function getChItems(bi){ return Array.from({length:BIBLE[bi].v.length},(_,i)=>String(i+1)); }
+function getVsItems(bi,ci,blank=false){
+  const max=BIBLE[bi].v[ci];
+  const its=Array.from({length:max},(_,i)=>String(i+1));
+  return blank?['',...its]:its;
+}
+
+function updateBibleCaption(){
+  const bk=BIBLE[rptBook].n;
+  const ch=rptChap+1;
+  const v1=rptVs1+1;
+  const v2=rptVs2;
+  let txt=`${bk} ${ch}장 ${v1}절`;
+  if(v2!==''&&+v2>v1) txt+=`~${v2}절`;
+  else if(v2!==''&&+v2===v1) txt+='';
+  const el=document.getElementById('bible-caption');
+  if(el) el.textContent=txt;
+}
+
+// 나중에 보고서 출력 시 사용할 본문 텍스트 반환 함수
+function getRptPassage(){
+  const bk=BIBLE[rptBook].n;
+  const ch=rptChap+1;
+  const v1=rptVs1+1;
+  const v2=rptVs2;
+  if(v2===''||+v2<=v1) return `${bk} ${ch}:${v1}`;
+  return `${bk} ${ch}:${v1}~${v2}`;
+}
+
+
+// ── ★ 출석 인원 현황 ─────────────────────────────────────────
+let visitorCnt = 0;
+
+function initRptStats(){
+  // 재적: 등록 학생 수
+  const el_roster = document.getElementById('rpt-roster');
+  if(el_roster) el_roster.textContent = students.length;
+
+  // 오늘 출석 캐시에서 집계
+  const records = getCache();
+  const el_attend = document.getElementById('rpt-attend');
+  const el_m = document.getElementById('rpt-m-attend');
+  const el_f = document.getElementById('rpt-f-attend');
+  if(el_attend) el_attend.textContent = records.length;
+  if(el_m) el_m.textContent = records.filter(r=>r.gender==='남').length;
+  if(el_f) el_f.textContent = records.filter(r=>r.gender==='여').length;
+
+  // 방문자 초기화
+  const vm = document.getElementById('rpt-visitors-m');
+  const vf = document.getElementById('rpt-visitors-f');
+  const at = document.getElementById('rpt-abs-teachers');
+  const ta = document.getElementById('rpt-teacher-attend');
+  if(vm) vm.innerHTML = '';
+  if(vf) vf.innerHTML = '';
+  if(at) at.innerHTML = '';
+  if(ta) ta.value = '0';
+  visitorCnt = 0; absTeacherCnt = 0;
+  // 행사 / 건의사항 초기화
+  const ev = document.getElementById('rpt-events');
+  const sg = document.getElementById('rpt-suggestions');
+  if(ev) ev.innerHTML = '';
+  if(sg) sg.innerHTML = '';
+  eventCnt = 0; suggestionCnt = 0;
+}
+
+function addVisitor(gender, data={}){
+  const container = document.getElementById(`rpt-visitors-${gender}`);
+  if(!container) return;
+  const id = ++visitorCnt;
+  const row = document.createElement('div');
+  row.className = 'rpt-visitor-row';
+  row.id = `vrow-${id}`;
+  row.innerHTML = `
+    <input class="rpt-vinp" type="text" placeholder="이름" value="${data.name||''}"/>
+    <input class="rpt-vinp sm" type="text" placeholder="나이/학년" value="${data.info||''}"/>
+    <button class="rpt-vdel" onclick="removeVisitor(${id})">✕</button>`;
+  container.appendChild(row);
+  if(!data.name) row.querySelector('input').focus();
+}
+
+let absTeacherCnt = 0;
+function addAbsTeacher(data={}){
+  const container = document.getElementById('rpt-abs-teachers');
+  if(!container) return;
+  const id = ++absTeacherCnt;
+  const row = document.createElement('div');
+  row.className = 'rpt-visitor-row';
+  row.id = `atrow-${id}`;
+  row.innerHTML = `
+    <input class="rpt-vinp" type="text" placeholder="이름" value="${data.name||''}"/>
+    <input class="rpt-vinp" type="text" placeholder="결석 사유" value="${data.reason||''}"/>
+    <button class="rpt-vdel" onclick="removeAbsTeacher(${id})">✕</button>`;
+  container.appendChild(row);
+  if(!data.name) row.querySelector('input').focus();
+}
+
+function removeAbsTeacher(id){
+  const el = document.getElementById(`atrow-${id}`);
+  if(el) el.remove();
+}
+
+// 방문자 데이터 읽기 (나중에 보고서 출력 시 사용)
+function getVisitors(gender){
+  const container = document.getElementById(`rpt-visitors-${gender}`);
+  if(!container) return [];
+  return [...container.querySelectorAll('.rpt-visitor-row')].map(row=>{
+    const inputs = row.querySelectorAll('input');
+    return { name: inputs[0]?.value.trim()||'', info: inputs[1]?.value.trim()||'' };
+  }).filter(v=>v.name);
+}
+
+// ── ★ 행사 보고 ────────────────────────────────────────────────
+let eventCnt = 0;
+function addEvent(data={}){
+  const container = document.getElementById('rpt-events');
+  if(!container) return;
+  const id = ++eventCnt;
+  const card = document.createElement('div');
+  card.className = 'rpt-event-card';
+  card.id = `ecard-${id}`;
+  card.innerHTML = `
+    <div class="rpt-event-hdr">
+      <span class="rpt-event-label">행사 ${id}</span>
+      <button class="rpt-vdel" onclick="removeEvent(${id})">✕</button>
+    </div>
+    <div class="rpt-event-grid">
+      <div class="rpt-event-row">
+        <span class="rpt-event-key">행사명</span>
+        <input class="rpt-event-inp" type="text" placeholder="행사명 입력" value="${data.name||''}"/>
+      </div>
+      <div class="rpt-event-row">
+        <span class="rpt-event-key">행사내용</span>
+        <input class="rpt-event-inp" type="text" placeholder="내용 입력" value="${data.content||''}"/>
+      </div>
+      <div class="rpt-event-row">
+        <span class="rpt-event-key">장소</span>
+        <input class="rpt-event-inp" type="text" placeholder="장소 입력" value="${data.place||''}"/>
+      </div>
+      <div class="rpt-event-row">
+        <span class="rpt-event-key">담당자</span>
+        <input class="rpt-event-inp" type="text" placeholder="담당자 입력" value="${data.person||''}"/>
+      </div>
+    </div>`;
+  container.appendChild(card);
+  if(!data.name) card.querySelector('input').focus();
+}
+function removeEvent(id){
+  const el = document.getElementById(`ecard-${id}`);
+  if(el) el.remove();
+}
+function getEvents(){
+  const container = document.getElementById('rpt-events');
+  if(!container) return [];
+  return [...container.querySelectorAll('.rpt-event-card')].map(card=>{
+    const inputs = card.querySelectorAll('input');
+    return {
+      name:    inputs[0]?.value.trim()||'',
+      content: inputs[1]?.value.trim()||'',
+      place:   inputs[2]?.value.trim()||'',
+      person:  inputs[3]?.value.trim()||''
+    };
+  }).filter(e=>e.name||e.content);
+}
+
+// ── ★ 협조 및 건의사항 ─────────────────────────────────────────
+let suggestionCnt = 0;
+function addSuggestion(text=''){
+  const container = document.getElementById('rpt-suggestions');
+  if(!container) return;
+  const id = ++suggestionCnt;
+  const card = document.createElement('div');
+  card.className = 'rpt-sug-card';
+  card.id = `sgcard-${id}`;
+  card.innerHTML = `
+    <textarea class="rpt-sug-inp" rows="3" placeholder="내용을 입력하세요"></textarea>
+    <button class="rpt-vdel" style="margin-top:2px;" onclick="removeSuggestion(${id})">✕</button>`;
+  container.appendChild(card);
+  if(text) card.querySelector('textarea').value = text;
+  else card.querySelector('textarea').focus();
+}
+function removeSuggestion(id){
+  const el = document.getElementById(`sgcard-${id}`);
+  if(el) el.remove();
+}
+function getSuggestions(){
+  const container = document.getElementById('rpt-suggestions');
+  if(!container) return [];
+  return [...container.querySelectorAll('textarea')]
+    .map(t=>t.value.trim()).filter(Boolean);
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// ★ 보고자료 임시저장 / 불러오기
+// ══════════════════════════════════════════════════════════════
+
+// 현재 폼 데이터 수집
+function collectReportData(){
+  return {
+    savedAt: new Date().toLocaleString('ko-KR'),
+    date:  { y:rptY, m:rptM, d:rptD },
+    bible: { book:rptBook, chap:rptChap, vs1:rptVs1, vs2:rptVs2 },
+    sermon: document.getElementById('rpt-sermon')?.value||'',
+    prayer: document.getElementById('rpt-prayer')?.value||'',
+    teacherAttend: document.getElementById('rpt-teacher-attend')?.value||'0',
+    absTeachers: getAbsTeachers(),
+    visitorsM:   getVisitors('m'),
+    visitorsF:   getVisitors('f'),
+    events:      getEvents(),
+    suggestions: getSuggestions()
+  };
+}
+
+function getAbsTeachers(){
+  const c=document.getElementById('rpt-abs-teachers'); if(!c) return [];
+  return [...c.querySelectorAll('.rpt-visitor-row')].map(row=>{
+    const i=row.querySelectorAll('input');
+    return {name:i[0]?.value.trim()||'', reason:i[1]?.value.trim()||''};
+  }).filter(t=>t.name||t.reason);
+}
+
+// 폼에 데이터 적용
+function applyReportData(draft){
+  // 날짜
+  if(draft.date){
+    rptY=draft.date.y; rptM=draft.date.m; rptD=draft.date.d;
+    if(drumDateReady){
+      drumY.setVal(String(rptY),false);
+      drumM.setVal(String(rptM).padStart(2,'0'),false);
+      drumD.reload(getDayItems(rptY,rptM));
+      drumD.setVal(String(rptD).padStart(2,'0'),false);
+      updateCaption();
+    }
+  }
+  // 성경 본문
+  if(draft.bible){
+    rptBook=draft.bible.book; rptChap=draft.bible.chap;
+    rptVs1=draft.bible.vs1;   rptVs2=draft.bible.vs2;
+    if(drumBibleReady){
+      drumBk.setIdx(rptBook,false);
+      drumCh.reload(getChItems(rptBook),false);
+      drumCh.setIdx(rptChap,false);
+      drumV1.reload(getVsItems(rptBook,rptChap),false);
+      drumV1.setIdx(rptVs1,false);
+      drumV2.reload(getVsItems(rptBook,rptChap,true),false);
+      drumV2.setIdx(rptVs2===''?0:+rptVs2,false);
+      updateBibleCaption();
+    }
+  }
+  // 텍스트 필드
+  const s=document.getElementById('rpt-sermon');
+  const p=document.getElementById('rpt-prayer');
+  const ta=document.getElementById('rpt-teacher-attend');
+  if(s) s.value=draft.sermon||'';
+  if(p) p.value=draft.prayer||'';
+  if(ta) ta.value=draft.teacherAttend||'0';
+  // 방문자
+  const vm=document.getElementById('rpt-visitors-m');
+  const vf=document.getElementById('rpt-visitors-f');
+  const at=document.getElementById('rpt-abs-teachers');
+  const ev=document.getElementById('rpt-events');
+  const sg=document.getElementById('rpt-suggestions');
+  if(vm) vm.innerHTML='';
+  if(vf) vf.innerHTML='';
+  if(at) at.innerHTML='';
+  if(ev) ev.innerHTML='';
+  if(sg) sg.innerHTML='';
+  visitorCnt=0; absTeacherCnt=0; eventCnt=0; suggestionCnt=0;
+  (draft.visitorsM||[]).forEach(v=>addVisitor('m',v));
+  (draft.visitorsF||[]).forEach(v=>addVisitor('f',v));
+  (draft.absTeachers||[]).forEach(t=>addAbsTeacher(t));
+  (draft.events||[]).forEach(e=>addEvent(e));
+  (draft.suggestions||[]).forEach(s=>addSuggestion(s));
+}
+
+async function saveReportDraft(){
+  const draft = collectReportData();
+  setLoading(true,'임시저장 중...');
+  try{
+    const data = await api({action:'saveReportDraft', draft:JSON.stringify(draft)});
+    if(data.error){ showToast('오류: '+data.error); return; }
+    const el=document.getElementById('rpt-draft-info');
+    if(el) el.textContent=`💾 ${draft.savedAt} 저장됨`;
+    showToast('임시저장 완료 ✓');
+  }catch(e){ showToast('저장 실패: '+e.message); }
+  finally{ setLoading(false); }
+}
+
+async function loadReportDraft(){
+  setLoading(true,'불러오는 중...');
+  try{
+    const data = await api({action:'loadReportDraft'});
+    if(data.error){ showToast('오류: '+data.error); return; }
+    if(!data.draft){ showToast('저장된 임시 데이터가 없습니다'); return; }
+    const draft = JSON.parse(data.draft);
+    applyReportData(draft);
+    const el=document.getElementById('rpt-draft-info');
+    if(el) el.textContent=`💾 ${draft.savedAt||''} 저장본 불러옴`;
+    showToast('임시저장 데이터를 불러왔습니다 ✓');
+  }catch(e){ showToast('불러오기 실패: '+e.message); }
+  finally{ setLoading(false); }
+}
+function initBibleDrums(){
+  const bkItems=getBkItems();
+  const chItems=getChItems(0);
+  const vsItems=getVsItems(0,0);
+  const vs2Items=getVsItems(0,0,true);
+
+  if(!drumBibleReady){
+    drumBibleReady=true;
+    drumBk=createDrum('dp-bk',bkItems,bkItems[0],v=>{
+      rptBook=BIBLE.findIndex(b=>b.n===v);
+      rptChap=0; rptVs1=0; rptVs2='';
+      drumCh.reload(getChItems(rptBook),false);
+      drumV1.reload(getVsItems(rptBook,0),false);
+      drumV2.reload(getVsItems(rptBook,0,true),false);
+      updateBibleCaption();
+    },{selFs:'14px',regFs:'11px'});
+
+    drumCh=createDrum('dp-ch',chItems,'1',v=>{
+      rptChap=+v-1; rptVs1=0; rptVs2='';
+      drumV1.reload(getVsItems(rptBook,rptChap),false);
+      drumV2.reload(getVsItems(rptBook,rptChap,true),false);
+      updateBibleCaption();
+    });
+
+    drumV1=createDrum('dp-v1',vsItems,'1',v=>{
+      rptVs1=+v-1; updateBibleCaption();
+    });
+
+    drumV2=createDrum('dp-v2',vs2Items,'',v=>{
+      rptVs2=v; updateBibleCaption();
+    });
+  } else {
+    drumBk.setIdx(rptBook,false);
+    drumCh.reload(getChItems(rptBook),false);
+    drumCh.setIdx(rptChap,false);
+    drumV1.reload(getVsItems(rptBook,rptChap),false);
+    drumV1.setIdx(rptVs1,false);
+    drumV2.reload(getVsItems(rptBook,rptChap,true),false);
+    drumV2.setIdx(rptVs2===''?0:+rptVs2,false);
+  }
+  updateBibleCaption();
+}
+
+// ══════════════════════════════════════════════════════════════
+// ★ 보고서 이미지 다운로드
+// ══════════════════════════════════════════════════════════════
+
+
+// ── ★ 보고자료 옵저버 전송 ─────────────────────────────────────
+async function submitReportToObserver(){
+  if(!OBSERVER_URL || OBSERVER_URL.includes('여기에')){
+    showToast('옵저버 URL이 설정되지 않았습니다\nindex.html의 OBSERVER_URL을 입력해주세요');
+    return;
+  }
+  if(!confirm(`${currentDept?.name||''} 보고자료를 옵저버로 전송하시겠습니까?`)) return;
+
+  const data    = collectReportData();
+  const passage = getRptPassage();
+  const roster  = document.getElementById('rpt-roster')?.textContent  || students.length;
+  const attend  = document.getElementById('rpt-attend')?.textContent  || '0';
+  const mAtt    = document.getElementById('rpt-m-attend')?.textContent|| '0';
+  const fAtt    = document.getElementById('rpt-f-attend')?.textContent|| '0';
+  const dateStr = `${data.date.y}-${String(data.date.m).padStart(2,'0')}-${String(data.date.d).padStart(2,'0')}`;
+
+  const payload = {
+    ...data,
+    passage,
+    roster, attend,
+    mAttend: mAtt,
+    fAttend: fAtt
+  };
+
+  setLoading(true, '보고자료 전송 중...');
+  try{
+    const url = new URL(OBSERVER_URL);
+    url.searchParams.set('action', 'submitReport');
+    url.searchParams.set('dept',   currentDept?.name || '');
+    url.searchParams.set('date',   dateStr);
+    url.searchParams.set('data',   JSON.stringify(payload));
+    url.searchParams.set('_t',     Date.now());
+
+    const res    = await fetch(url.toString(), {redirect:'follow', cache:'no-cache'});
+    const result = await res.json();
+
+    if(result.error){ showToast('전송 실패: '+result.error); return; }
+    showToast(`${currentDept?.name||''} 보고자료 전송 완료 ✓`);
+  }catch(e){
+    showToast('전송 실패: '+e.message);
+  }finally{
+    setLoading(false);
+  }
+}
+
+let _imgDataUrl = '', _imgFilename = '';
+
+async function generateReportImage(){
+  if(typeof html2canvas==='undefined'){
+    showToast('라이브러리 로딩 중입니다. 잠시 후 다시 시도해주세요.'); return;
+  }
+  setLoading(true,'보고서 이미지 생성 중...');
+  try{
+    const data = collectReportData();
+    const el = document.createElement('div');
+    el.style.cssText='position:fixed;left:-9999px;top:0;width:700px;background:#fff;font-family:-apple-system,Apple SD Gothic Neo,Malgun Gothic,sans-serif;';
+    el.innerHTML = buildReportHTML(data);
+    document.body.appendChild(el);
+    const canvas = await html2canvas(el, {scale:2, backgroundColor:'#ffffff', useCORS:true, logging:false});
+    document.body.removeChild(el);
+
+    const dept = currentDept?.name||'교육부';
+    const ds   = `${data.date.y}${String(data.date.m).padStart(2,'0')}${String(data.date.d).padStart(2,'0')}`;
+    _imgDataUrl  = canvas.toDataURL('image/png');
+    _imgFilename = `${dept}_보고자료_${ds}.png`;
+
+    const isIOS   = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isInApp = /KAKAOTALK|KakaoBrowser|NAVER|NaverApp|Instagram|FB_IAB|FB4A|FBIOS|Line\/|Twitter/i.test(navigator.userAgent);
+
+    if(!isIOS && !isInApp){
+      // PC · 안드로이드 일반 브라우저: 바로 다운로드
+      const link = document.createElement('a');
+      link.download = _imgFilename;
+      link.href = _imgDataUrl;
+      link.click();
+      showToast('이미지 다운로드 완료 ✓');
+    } else {
+      // iOS 또는 인앱 브라우저: 오버레이 표시
+      openImgOverlay(_imgDataUrl, isInApp);
+    }
+  }catch(e){
+    showToast('이미지 생성 실패: '+e.message);
+  }finally{ setLoading(false); }
+}
+
+function openImgOverlay(dataUrl, isInApp){
+  document.getElementById('img-preview').src = dataUrl;
+  // 안내 문구: 인앱 브라우저는 외부 브라우저 안내 추가
+  const guide = document.querySelector('.img-overlay > div:first-child');
+  if(guide){
+    guide.innerHTML = isInApp
+      ? '📱 이미지를 <b>길게 눌러</b> 저장하세요<br><span style="font-size:11px;opacity:.7">더 잘 저장되려면 우측 상단 ···→ 다른 브라우저로 열기</span>'
+      : '📱 이미지를 <b>길게 눌러</b> 저장하세요';
+  }
+  // Web Share API 지원 여부에 따라 공유 버튼 표시
+  const shareBtn = document.getElementById('img-share-btn');
+  if(shareBtn) shareBtn.style.display = navigator.share ? '' : 'none';
+  document.getElementById('img-overlay').classList.add('show');
+}
+
+function closeImgOverlay(){
+  document.getElementById('img-overlay').classList.remove('show');
+}
+
+async function shareImage(){
+  if(!navigator.share || !_imgDataUrl) return;
+  try{
+    const blob = await (await fetch(_imgDataUrl)).blob();
+    const file = new File([blob], _imgFilename, {type:'image/png'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:_imgFilename});
+    } else {
+      await navigator.share({title:_imgFilename, url:_imgDataUrl});
+    }
+  }catch(e){
+    if(e.name!=='AbortError') showToast('공유 실패: '+e.message);
+  }
+}
+
+function buildReportHTML(data){
+  const dept   = currentDept?.name||'';
+  const dateStr= `${data.date.y}년 ${data.date.m}월 ${data.date.d}일`;
+  const passage= getRptPassage();
+  const roster = document.getElementById('rpt-roster')?.textContent||students.length;
+  const attend = document.getElementById('rpt-attend')?.textContent||'-';
+  const mAtt   = document.getElementById('rpt-m-attend')?.textContent||'-';
+  const fAtt   = document.getElementById('rpt-f-attend')?.textContent||'-';
+  const visitM = (data.visitorsM||[]).length;
+  const visitF = (data.visitorsF||[]).length;
+
+  const S = `font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;`;
+  const tdBase = `border:1px solid #ccc;padding:8px 11px;font-size:13px;${S}`;
+  const thBase = `${tdBase}background:#1a5276;color:#fff;font-weight:700;text-align:center;`;
+  const secTtl = `font-size:14px;font-weight:700;color:#1a5276;border-left:4px solid #1a5276;padding-left:8px;margin:18px 0 8px;${S}`;
+
+  let h = `
+  <div style="background:#1a5276;padding:22px 24px;text-align:center;">
+    <div style="font-size:13px;color:rgba(255,255,255,.75);margin-bottom:3px;${S}">서부제일교회</div>
+    <div style="font-size:22px;font-weight:700;color:#fff;margin-bottom:3px;${S}">${dept} 주일 출석 보고</div>
+    <div style="font-size:14px;color:rgba(255,255,255,.85);${S}">${dateStr}</div>
+  </div>
+  <div style="padding:20px 24px;">`;
+
+  // 설교 정보
+  h += `<div style="${secTtl}">설교 정보</div>
+  <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+    <tr><td style="${tdBase}background:#f5f5f5;font-weight:600;width:90px;">설교 본문</td><td style="${tdBase}">${passage||'-'}</td></tr>
+    <tr><td style="${tdBase}background:#f5f5f5;font-weight:600;">설교 제목</td><td style="${tdBase}">${data.sermon||'-'}</td></tr>
+    <tr><td style="${tdBase}background:#f5f5f5;font-weight:600;">대표기도자</td><td style="${tdBase}">${data.prayer||'-'}</td></tr>
+  </table>`;
+
+  // 출석 현황
+  h += `<div style="${secTtl}">출석 현황</div>
+  <table style="width:100%;border-collapse:collapse;text-align:center;margin-bottom:4px;">
+    <tr>
+      <th style="${thBase}">재적</th><th style="${thBase}">출석</th>
+      <th style="${thBase}">남(재적)</th><th style="${thBase}">여(재적)</th>
+      <th style="${thBase}">남(방문)</th><th style="${thBase}">여(방문)</th>
+    </tr>
+    <tr>
+      <td style="${tdBase}font-size:18px;font-weight:700;text-align:center;">${roster}</td>
+      <td style="${tdBase}font-size:18px;font-weight:700;text-align:center;">${attend}</td>
+      <td style="${tdBase}font-size:18px;font-weight:700;text-align:center;">${mAtt}</td>
+      <td style="${tdBase}font-size:18px;font-weight:700;text-align:center;">${fAtt}</td>
+      <td style="${tdBase}font-size:18px;font-weight:700;text-align:center;">${visitM}</td>
+      <td style="${tdBase}font-size:18px;font-weight:700;text-align:center;">${visitF}</td>
+    </tr>
+  </table>`;
+
+  // 방문자
+  if(visitM||visitF){
+    h += `<div style="${secTtl}">방문자</div>`;
+    if(visitM) h += `<div style="font-size:13px;margin-bottom:4px;${S}">남: ${(data.visitorsM||[]).map(v=>v.name+(v.info?` (${v.info})`:'') ).join(', ')}</div>`;
+    if(visitF) h += `<div style="font-size:13px;margin-bottom:4px;${S}">여: ${(data.visitorsF||[]).map(v=>v.name+(v.info?` (${v.info})`:'') ).join(', ')}</div>`;
+  }
+
+  // 교사
+  h += `<div style="${secTtl}">교사</div>
+  <div style="font-size:13px;margin-bottom:4px;${S}">출석: ${data.teacherAttend||0}명</div>`;
+  const absT = data.absTeachers||[];
+  if(absT.length)
+    h += `<div style="font-size:13px;margin-bottom:4px;${S}">결석: ${absT.map(t=>t.name+(t.reason?` (${t.reason})`:'') ).join(', ')}</div>`;
+  else
+    h += `<div style="font-size:13px;margin-bottom:4px;${S}">결석: 없음</div>`;
+
+  // 행사
+  const evts = data.events||[];
+  if(evts.length){
+    h += `<div style="${secTtl}">금주 및 다음 주 행사 보고</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+      <tr>
+        <th style="${thBase}">행사명</th><th style="${thBase}">행사내용</th>
+        <th style="${thBase}">장소</th><th style="${thBase}">담당자</th>
+      </tr>`;
+    evts.forEach(e=>{
+      h+=`<tr>
+        <td style="${tdBase}">${e.name||'-'}</td><td style="${tdBase}">${e.content||'-'}</td>
+        <td style="${tdBase}">${e.place||'-'}</td><td style="${tdBase}">${e.person||'-'}</td>
+      </tr>`;
+    });
+    h += `</table>`;
+  }
+
+  // 건의사항
+  const sugs = data.suggestions||[];
+  if(sugs.length){
+    h += `<div style="${secTtl}">협조 및 건의사항</div>`;
+    sugs.forEach((s,i)=>{
+      h+=`<div style="font-size:13px;margin-bottom:5px;line-height:1.6;${S}">${i+1}. ${s}</div>`;
+    });
+  }
+
+  h += `<div style="margin-top:20px;padding-top:12px;border-top:1px solid #eee;text-align:right;font-size:11px;color:#999;${S}">
+    서부제일교회 교육부 보고자료
+  </div></div>`;
+  return h;
+}
+function goReport(){
+  document.getElementById('report-dept-label').textContent = '· ' + (currentDept?.name || '');
+  showScreen('s-report');
+  window.scrollTo(0,0);
+  setTimeout(()=>{ initDateDrums(); initBibleDrums(); initRptStats(); }, 50);
+}
 function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 function onPickerChange(){ document.getElementById('s-color-txt').value=document.getElementById('s-color-pick').value; }
 document.getElementById('s-color-txt').addEventListener('input',function(){ if(/^#[0-9A-Fa-f]{6}$/.test(this.value)) document.getElementById('s-color-pick').value=this.value; });
