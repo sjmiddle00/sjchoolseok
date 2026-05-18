@@ -1706,9 +1706,9 @@ function initDateDrums(){
 
   if(!drumDateReady){
     drumDateReady=true;
-    drumY=createDrum('dp-year', years,  String(rptY),                 v=>{ rptY=+v; const di=getDayItems(rptY,rptM); drumD.reload(di); rptD=+drumD.val(); updateCaption(); });
-    drumM=createDrum('dp-month',months, String(rptM).padStart(2,'0'), v=>{ rptM=+v; const di=getDayItems(rptY,rptM); drumD.reload(di); rptD=+drumD.val(); updateCaption(); });
-    drumD=createDrum('dp-day',  days,   String(rptD).padStart(2,'0'), v=>{ rptD=+v; updateCaption(); });
+    drumY=createDrum('dp-year', years,  String(rptY),                 v=>{ rptY=+v; const di=getDayItems(rptY,rptM); drumD.reload(di); rptD=+drumD.val(); updateCaption(); scheduleFetchRptStats(); });
+    drumM=createDrum('dp-month',months, String(rptM).padStart(2,'0'), v=>{ rptM=+v; const di=getDayItems(rptY,rptM); drumD.reload(di); rptD=+drumD.val(); updateCaption(); scheduleFetchRptStats(); });
+    drumD=createDrum('dp-day',  days,   String(rptD).padStart(2,'0'), v=>{ rptD=+v; updateCaption(); scheduleFetchRptStats(); });
   } else {
     drumY.setVal(String(rptY));
     drumM.setVal(String(rptM).padStart(2,'0'));
@@ -1883,19 +1883,44 @@ function getRptPassage(){
 // ── ★ 출석 인원 현황 ─────────────────────────────────────────
 let visitorCnt = 0;
 
+
+// ── ★ 날짜 기준 출석 데이터 GAS 조회 ─────────────────────────
+let _fetchRptTimer = null;
+function scheduleFetchRptStats(){
+  if(_fetchRptTimer) clearTimeout(_fetchRptTimer);
+  _fetchRptTimer = setTimeout(fetchRptStats, 700); // 드럼 멈추면 700ms 후 조회
+}
+
+async function fetchRptStats(){
+  const ids = ['rpt-attend','rpt-m-attend','rpt-f-attend'];
+  ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='…'; });
+  const note = document.getElementById('rpt-stat-note');
+  if(note) note.textContent = '불러오는 중...';
+  try{
+    const dateStr = `${rptY}-${String(rptM).padStart(2,'0')}-${String(rptD).padStart(2,'0')}`;
+    const data = await api({action:'recordsByDate', date:dateStr});
+    if(data.error) throw new Error(data.error);
+    const rec = data.records||[];
+    const elA = document.getElementById('rpt-attend');
+    const elM = document.getElementById('rpt-m-attend');
+    const elF = document.getElementById('rpt-f-attend');
+    if(elA) elA.textContent = rec.length;
+    if(elM) elM.textContent = rec.filter(r=>r.gender==='남').length;
+    if(elF) elF.textContent = rec.filter(r=>r.gender==='여').length;
+    if(note) note.textContent = `${rptY}년 ${rptM}월 ${rptD}일 출석 기준`;
+  }catch(e){
+    ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='-'; });
+    if(note) note.textContent = '출석 데이터를 불러올 수 없습니다';
+  }
+}
+
 function initRptStats(){
-  // 재적: 등록 학생 수
+  // 재적: 등록 학생 수 즉시 표시
   const el_roster = document.getElementById('rpt-roster');
   if(el_roster) el_roster.textContent = students.length;
 
-  // 오늘 출석 캐시에서 집계
-  const records = getCache();
-  const el_attend = document.getElementById('rpt-attend');
-  const el_m = document.getElementById('rpt-m-attend');
-  const el_f = document.getElementById('rpt-f-attend');
-  if(el_attend) el_attend.textContent = records.length;
-  if(el_m) el_m.textContent = records.filter(r=>r.gender==='남').length;
-  if(el_f) el_f.textContent = records.filter(r=>r.gender==='여').length;
+  // 출석 데이터는 선택한 날짜 기준으로 GAS에서 불러오기
+  fetchRptStats();
 
   // 방문자 초기화
   const vm = document.getElementById('rpt-visitors-m');
