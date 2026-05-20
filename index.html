@@ -1605,16 +1605,17 @@ function createDrum(colId, items, initVal, onChange, opts){
   const col = document.getElementById(colId);
   if(!col) return null;
   let its = [...items];
-  let idx = Math.max(0, its.indexOf(initVal));
-  let sy=0, so=0, dragging=false;
+  let idx  = Math.max(0, its.indexOf(initVal));
+  // 드래그 상태
+  let startY=0, so=0, dragging=false;
+  // 관성용 속도 추적
+  let lastY=0, lastT=0, vel=0, raf=null;
 
   function build(){
     col.innerHTML=`<div class="dp-list" id="${colId}-L"></div>
       <div class="dp-fade-t"></div><div class="dp-fade-b"></div>
       <div class="dp-sel"></div>`;
-    renderList();
-    moveTo(idx, false);
-    paint();
+    renderList(); setTY(-idx*DP_H, false); paint();
   }
   function list(){ return document.getElementById(colId+'-L'); }
   function renderList(){
@@ -1623,63 +1624,103 @@ function createDrum(colId, items, initVal, onChange, opts){
       its.map((v,i)=>`<div class="dp-item" data-i="${i}">${v}</div>`).join('') +
       pads;
   }
-  function moveTo(i, anim){
-    idx = Math.max(0, Math.min(i, its.length-1));
+  // 현재 translateY 값 읽기
+  function getTY(){
+    const m=(list()?.style.transform||'').match(/translateY\((.+)px\)/);
+    return m ? parseFloat(m[1]) : -idx*DP_H;
+  }
+  function setTY(y, anim){
     const L=list(); if(!L) return;
     L.style.transition = anim ? 'transform .22s cubic-bezier(.25,.8,.25,1)' : 'none';
-    L.style.transform = `translateY(${-idx*DP_H}px)`;
+    L.style.transform  = `translateY(${y}px)`;
   }
   function paint(){
+    const sf=(opts&&opts.selFs)||'19px', rf=(opts&&opts.regFs)||'12px';
     col.querySelectorAll('.dp-item:not(.dp-pad)').forEach(el=>{
-      const d=Math.abs(+el.dataset.i - idx);
-      const sf=(opts&&opts.selFs)||'19px', rf=(opts&&opts.regFs)||'12px';
+      const d=Math.abs(+el.dataset.i-idx);
       el.style.fontSize   = d===0?sf:rf;
       el.style.fontWeight = d===0?'700':'400';
       el.style.opacity    = d===0?'1':'0.38';
       el.style.color      = d===0?'var(--txt)':'var(--muted)';
     });
   }
-  function snap(i){ moveTo(i,true); paint(); onChange(its[idx]); }
+  // 특정 인덱스로 부드럽게 스냅
+  function snapTo(i, anim){
+    idx=Math.max(0,Math.min(i,its.length-1));
+    setTY(-idx*DP_H, anim); paint(); onChange(its[idx]);
+  }
+  // 드래그/관성 중 아이템이 바뀔 때
+  function tickTo(i){
+    const ni=Math.max(0,Math.min(i,its.length-1));
+    if(ni!==idx){ idx=ni; paint(); }
+  }
 
   function onStart(e){
+    if(raf){ cancelAnimationFrame(raf); raf=null; }
     dragging=true;
-    sy = e.touches?e.touches[0].clientY:e.clientY;
-    so = -idx*DP_H;
+    const y=e.touches?e.touches[0].clientY:e.clientY;
+    startY=lastY=y; lastT=Date.now(); vel=0;
+    so=getTY();
     list().style.transition='none';
     e.preventDefault();
   }
   function onMove(e){
     if(!dragging) return;
-    const cy=e.touches?e.touches[0].clientY:e.clientY;
-    const raw=so+(cy-sy);
+    const y=e.touches?e.touches[0].clientY:e.clientY;
+    const now=Date.now(), dt=now-lastT;
+    if(dt>0) vel=(lastY-y)/dt;   // px/ms
+    lastY=y; lastT=now;
+    const raw=so+(y-startY);
     const mn=-(its.length-1)*DP_H, mx=0;
     const cl=raw<mn?mn+(raw-mn)*.15:raw>mx?mx+(raw-mx)*.15:raw;
     list().style.transform=`translateY(${cl}px)`;
-    const ni=Math.max(0,Math.min(Math.round(-raw/DP_H),its.length-1));
-    if(ni!==idx){idx=ni;paint();}
+    tickTo(Math.round(-raw/DP_H));
     e.preventDefault();
   }
   function onEnd(){
-    if(!dragging)return; dragging=false; snap(idx);
+    if(!dragging) return;
+    dragging=false;
+    // 속도가 충분하면 관성 스크롤
+    if(Math.abs(vel) > 0.08){
+      let cur=getTY();
+      const friction=0.88;   // 0에 가까울수록 빠르게 감속
+      function momentum(){
+        vel*=friction;
+        cur-=vel*16;          // 16ms ≈ 1프레임
+        const mn=-(its.length-1)*DP_H, mx=0;
+        if(cur<mn){ cur=mn; vel=0; }
+        if(cur>mx){ cur=mx; vel=0; }
+        list().style.transform=`translateY(${cur}px)`;
+        tickTo(Math.round(-cur/DP_H));
+        if(Math.abs(vel)>0.03){
+          raf=requestAnimationFrame(momentum);
+        } else {
+          snapTo(Math.round(-cur/DP_H), true);
+        }
+      }
+      raf=requestAnimationFrame(momentum);
+    } else {
+      snapTo(idx, true);
+    }
   }
 
   col.addEventListener('touchstart',onStart,{passive:false});
   col.addEventListener('touchmove', onMove, {passive:false});
   col.addEventListener('touchend',  onEnd);
   col.addEventListener('mousedown', onStart);
-  document.addEventListener('mousemove',e=>{if(dragging)onMove(e);});
-  document.addEventListener('mouseup',  e=>{if(dragging)onEnd();});
+  document.addEventListener('mousemove',e=>{ if(dragging) onMove(e); });
+  document.addEventListener('mouseup',  e=>{ if(dragging) onEnd(); });
 
   build();
   return {
     val:   ()=>its[idx],
-    setVal:(v,anim=true)=>{ const i=its.indexOf(v); if(i>=0){moveTo(i,anim);paint();} },
-    setIdx:(i,anim=true)=>{ idx=Math.max(0,Math.min(i,its.length-1)); moveTo(idx,anim); paint(); },
+    setVal:(v,anim=true)=>{ const i=its.indexOf(v); if(i>=0){idx=i;setTY(-idx*DP_H,anim);paint();} },
+    setIdx:(i,anim=true)=>{ idx=Math.max(0,Math.min(i,its.length-1)); setTY(-idx*DP_H,anim); paint(); },
     reload:(newIts,keepVal=true)=>{
       const prev=its[idx]; its=[...newIts];
       const ni=keepVal?Math.max(0,its.indexOf(prev)):0;
       idx=Math.max(0,Math.min(ni,its.length-1));
-      renderList(); moveTo(idx,false); paint();
+      renderList(); setTY(-idx*DP_H,false); paint();
     }
   };
 }
