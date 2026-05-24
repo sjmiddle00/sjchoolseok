@@ -1996,6 +1996,11 @@ function addVisitor(gender, data={}){
   if(!data.name) row.querySelector('input').focus();
 }
 
+function removeVisitor(id){
+  const el = document.getElementById(`vrow-${id}`);
+  if(el) el.remove();
+}
+
 let absTeacherCnt = 0;
 function addAbsTeacher(data={}){
   const container = document.getElementById('rpt-abs-teachers');
