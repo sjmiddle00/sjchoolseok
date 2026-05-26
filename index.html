@@ -172,6 +172,10 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .r-name{font-size:15px;font-weight:600;}.r-meta{font-size:11px;color:var(--muted);margin-top:2px;}
 .badge{font-size:12px;font-weight:700;padding:5px 13px;border-radius:20px;}
 .bp{background:var(--gr-bg);color:var(--gr-fg);}.bl{background:var(--or-bg);color:var(--or-fg);}
+.bpend{background:#eef2f7;color:#7a8a9a;}
+.bf{background:#fdecea;color:var(--rd-fg);}
+.rec-pending{opacity:.7;}
+.pending-badge{display:none;background:#eef2f7;color:#5a6b7a;font-size:11px;font-weight:700;padding:3px 11px;border-radius:20px;margin-left:6px;}
 .empty-msg{text-align:center;padding:26px;color:var(--muted);font-size:14px;}
 
 /* ── 관리자 ────────────────────────────────────────────────── */
@@ -413,7 +417,7 @@ select, input, button { min-width: 0; box-sizing: border-box; }
 
   <div class="card">
     <div class="rec-hdr">
-      <div><div class="lbl" style="margin:0">오늘 출석 현황</div><div class="upd-time" id="upd-time"></div></div>
+      <div><div class="lbl" style="margin:0">오늘 출석 현황 <span class="pending-badge" id="pending-badge"></span></div><div class="upd-time" id="upd-time"></div></div>
       <div style="display:flex;align-items:center;gap:8px">
         <button onclick="refreshAll()" style="background:var(--pr-pl);color:var(--pr-dk);border:none;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;">↻ 새로고침</button>
         <div class="cnt-chip" id="cnt-chip">0명</div>
@@ -1175,8 +1179,13 @@ async function fetchStudents(){
 async function fetchRecords(){
   const data=await api({action:'records'});
   if(data.error) throw new Error(data.error);
-  setCache(data.records||[]);
-  renderRecords(data.records||[],true);
+  // 저장 대기 중인 낙관적 레코드는 보존하면서 서버 데이터와 병합
+  if(_saveQueue.length > 0){
+    syncServerRecords(data.records||[]);
+  } else {
+    setCache(data.records||[]);
+    renderRecords(data.records||[],true);
+  }
 }
 async function refreshAll(){
   setLoading(true,'새로고침 중...');
@@ -1195,11 +1204,20 @@ function renderRecords(records, showTime){
   }
   const el=document.getElementById('rec-list');
   if(!records.length){ el.innerHTML='<div class="empty-msg">📋 아직 출석 기록이 없어요</div>'; return; }
-  el.innerHTML=records.map(r=>`
-    <div class="rec-row">
+  el.innerHTML=records.map(r=>{
+    let rightSide;
+    if(r._failed){
+      rightSide = `<span class="badge bf">저장실패</span>`;
+    } else if(r._pending){
+      rightSide = `<span class="badge bpend">저장 중…</span>`;
+    } else {
+      rightSide = `<span class="badge ${r.status==='출석'?'bp':'bl'}">${esc(r.status)}</span>`;
+    }
+    return `<div class="rec-row${r._pending?' rec-pending':''}">
       <div><div class="r-name">${esc(dispName(r))}</div><div class="r-meta">${esc(r.grade)} · ${esc(r.time)}</div></div>
-      <span class="badge ${r.status==='출석'?'bp':'bl'}">${esc(r.status)}</span>
-    </div>`).join('');
+      ${rightSide}
+    </div>`;
+  }).join('');
 }
 
 // ── ★ 헬퍼 함수 ──────────────────────────────────────────────
@@ -1264,8 +1282,15 @@ function updateSubBtn(){
   document.getElementById('sub-btn').className = ok ? 'single-btn on' : 'single-btn off';
 }
 
-// ── 출석 제출 (시간에 따라 자동으로 출석/지각 판별) ─────────────
-async function doSubmit(){
+// ══════════════════════════════════════════════════════════════
+// ★ 출석 제출 — 낙관적 UI + 백그라운드 순차 저장 큐
+// ══════════════════════════════════════════════════════════════
+let _saveQueue = [];       // 저장 대기열
+let _queueRunning = false; // 큐 처리 중 여부
+let _pendingCount = 0;     // 저장 대기 중인 건수 (화면 표시용)
+
+// 출석 버튼 클릭 → 즉시 화면 반영, 저장은 큐에 추가
+function doSubmit(){
   const name = document.getElementById('name-sel').value;
   const found = students.find(s=>s.name===name) || {};
   const grade = found.grade || '';
@@ -1275,20 +1300,123 @@ async function doSubmit(){
   const mode = getAttendanceMode();
   const status = (mode === 'late') ? '지각' : '출석';
 
-  setLoading(true,'저장 중...');
-  try{
-    const data = await api({action:'submit', name, grade, gender, status});
-    if (data.duplicate){
-      document.getElementById('dup-attend-name').textContent=`${dispName(found)} (${grade})`;
-      openModal('dup-attend-modal'); return;
-    }
-    if (data.error){ showToast('오류: '+data.error); return; }
-    setCache(data.records||[]); renderRecords(data.records||[],true);
-    showToast(`${name} 출석 완료! 🙌`);
+  // 이미 화면(캐시)에 같은 학생이 있으면 중복 안내
+  const cached = getCache();
+  const already = cached.some(r => r.name===name && r.grade===grade);
+  if (already){
+    document.getElementById('dup-attend-name').textContent=`${dispName(found)} (${grade})`;
+    openModal('dup-attend-modal');
     resetForm();
-  }catch(e){ showToast('연결 오류: '+e.message, 4000); }
-  finally{ setLoading(false); }
+    return;
+  }
+
+  // ① 화면 즉시 반영 (낙관적)
+  const now = new Date();
+  const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const optimisticRec = { name, grade, gender, status, time:timeStr, _pending:true };
+  const newRecords = [...cached, optimisticRec];
+  setCache(newRecords);
+  renderRecords(newRecords, true);
+  showToast(`${name} 출석 완료! 🙌`);
+  resetForm();
+
+  // ② 저장 큐에 추가 → 백그라운드 순차 처리
+  _saveQueue.push({ name, grade, gender, status, retries:0 });
+  _pendingCount++;
+  updatePendingBadge();
+  runSaveQueue();
 }
+
+// 큐를 하나씩 순차 처리 (동시 저장 충돌·누락 방지)
+async function runSaveQueue(){
+  if (_queueRunning) return;
+  _queueRunning = true;
+
+  while (_saveQueue.length > 0){
+    const job = _saveQueue[0];
+    try{
+      const data = await api({action:'submit', name:job.name, grade:job.grade, gender:job.gender, status:job.status});
+
+      if (data.duplicate){
+        // 서버에 이미 있는 경우: 정상 처리로 간주하고 큐에서 제거
+        _saveQueue.shift(); _pendingCount=Math.max(0,_pendingCount-1); updatePendingBadge();
+        syncServerRecords(data.records);
+        continue;
+      }
+      if (data.error) throw new Error(data.error);
+
+      // 저장 성공 → 큐에서 제거, 서버 기준으로 동기화
+      _saveQueue.shift(); _pendingCount=Math.max(0,_pendingCount-1); updatePendingBadge();
+      if (data.records) syncServerRecords(data.records);
+
+    }catch(e){
+      // 실패 → 재시도 (최대 4회, 점점 간격 늘림)
+      job.retries = (job.retries||0) + 1;
+      if (job.retries <= 4){
+        await sleep(800 * job.retries);  // 0.8s, 1.6s, 2.4s, 3.2s
+        continue;  // 같은 job 다시 시도
+      } else {
+        // 최종 실패 → 큐에서 빼고 사용자에게 알림 (누락 방지)
+        _saveQueue.shift(); _pendingCount=Math.max(0,_pendingCount-1); updatePendingBadge();
+        markFailedRecord(job.name, job.grade);
+        showToast(`⚠️ ${job.name} 저장 실패 — 다시 출석해주세요`, 5000);
+      }
+    }
+  }
+  _queueRunning = false;
+}
+
+function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+
+// 저장 안 된 항목이 있을 때 페이지 이탈 경고
+window.addEventListener('beforeunload', function(e){
+  if(_saveQueue.length > 0){
+    e.preventDefault();
+    e.returnValue = '아직 저장 중인 출석 기록이 있습니다. 나가시겠습니까?';
+    return e.returnValue;
+  }
+});
+
+// 서버 응답으로 캐시·화면 동기화 (단, 아직 저장 안 된 대기 항목은 유지)
+function syncServerRecords(serverRecords){
+  if (!Array.isArray(serverRecords)) return;
+  // 큐에 남아있는(아직 저장 안 된) 학생들의 낙관적 레코드는 보존
+  const pendingNames = new Set(_saveQueue.map(j => j.name+'__'+j.grade));
+  const cached = getCache();
+  const pendingRecs = cached.filter(r => r._pending && pendingNames.has(r.name+'__'+r.grade));
+  // 서버 레코드 + 아직 대기 중인 낙관적 레코드 병합
+  const merged = [...serverRecords];
+  pendingRecs.forEach(pr=>{
+    if(!merged.some(m=>m.name===pr.name && m.grade===pr.grade)) merged.push(pr);
+  });
+  setCache(merged);
+  renderRecords(merged, true);
+}
+
+// 저장 최종 실패한 레코드를 화면에서 표시
+function markFailedRecord(name, grade){
+  const cached = getCache();
+  const idx = cached.findIndex(r => r.name===name && r.grade===grade && r._pending);
+  if (idx >= 0){
+    cached[idx]._failed = true;
+    delete cached[idx]._pending;
+    setCache(cached);
+    renderRecords(cached, true);
+  }
+}
+
+// 저장 대기 건수 배지 업데이트
+function updatePendingBadge(){
+  const el = document.getElementById('pending-badge');
+  if (!el) return;
+  if (_pendingCount > 0){
+    el.textContent = `저장 중 ${_pendingCount}건`;
+    el.style.display = 'inline-block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
 function resetForm(){
   document.getElementById('name-sel').value='';
   updateSubBtn();
