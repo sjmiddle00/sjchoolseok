@@ -218,6 +218,8 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .stu-grade{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--pr-pl);color:var(--pr-dk);display:inline-block;margin-top:3px;}
 .stu-item.sel .stu-grade{background:rgba(125,60,152,.2);}
 .del-btn{background:var(--rd-bg);color:var(--rd-fg);border:none;width:32px;height:32px;border-radius:50%;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.edit-btn{background:#eaf4fb;color:#1a5276;border:none;width:32px;height:32px;border-radius:50%;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:6px;}
+.edit-btn:active{opacity:.7;}
 .sett-row{margin-bottom:14px;}
 .sett-lbl{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px;}
 .sett-sub{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;}
@@ -792,6 +794,35 @@ select, input, button { min-width: 0; box-sizing: border-box; }
   </div>
 </div>
 
+<!-- 학생 정보 수정 모달 -->
+<div class="overlay" id="edit-stu-modal">
+  <div class="modal">
+    <h3>✏️ 학생 정보 수정</h3>
+    <div style="display:flex;flex-direction:column;gap:10px;margin:16px 0;">
+      <select class="grade-inp" id="edit-grade" style="display:none;width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);">
+        <option value="">학년 선택</option>
+        <option>초등1</option><option>초등2</option><option>초등3</option>
+        <option>초등4</option><option>초등5</option><option>초등6</option>
+        <option>중1</option><option>중2</option><option>중3</option>
+        <option>고1</option><option>고2</option><option>고3</option>
+      </select>
+      <input class="inp" id="edit-year" type="number" placeholder="출생연도 (예: 92)" min="1" max="2099"
+             style="display:none;width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);"/>
+      <select class="gender-sel" id="edit-gender" style="width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);">
+        <option value="">성별 선택</option>
+        <option value="남">남</option>
+        <option value="여">여</option>
+      </select>
+      <input class="inp" id="edit-name" type="text" placeholder="이름 입력"
+             style="width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);"
+             onkeydown="if(event.key==='Enter')saveEditStudent()"/>
+    </div>
+    <div class="pw-err" id="edit-stu-err"></div>
+    <button class="mbtn mbtn-p" onclick="saveEditStudent()">저장</button>
+    <button class="mbtn mbtn-s" onclick="closeModal('edit-stu-modal')">취소</button>
+  </div>
+</div>
+
 <!-- 부서 활성화/비활성화 관리 시트 -->
 <div class="dept-admin-overlay" id="dept-admin-overlay">
   <div class="dept-admin-sheet">
@@ -1034,11 +1065,6 @@ function selectDept(dept, showLoading=true){
   if (cached.length) renderRecords(cached, false);
 
   bootApp(showLoading);
-}
-
-function changeDept(){
-  goMain();
-  setTimeout(()=>{ showScreen('s-dept'); renderDeptGrid(); }, 100);
 }
 
 // ── 앱 부트 ──────────────────────────────────────────────────
@@ -1388,6 +1414,7 @@ function renderStudentList(){
           <span class="stu-grade">${isDeptYearType()?(s.grade+'년생'):esc(s.grade)}${s.gender?' · '+esc(s.gender):''}</span>
         </div>
       </div>
+      <button class="edit-btn" onclick="event.stopPropagation();openEditStudent('${esc(s.name)}','${esc(s.grade)}','${esc(s.gender||'')}')">✏️</button>
     </div>`;
   }).join('');
   updateBulkDeleteBtn(); updateSelectAllState();
@@ -1400,12 +1427,20 @@ async function bulkDeleteStudents(){
     const idx=key.indexOf('__');
     return {name:key.slice(0,idx), grade:key.slice(idx+2)};
   });
+  const CHUNK=40;  // URL 길이 제한 방지
+  const chunks=[];
+  for(let i=0;i<toDelete.length;i+=CHUNK) chunks.push(toDelete.slice(i,i+CHUNK));
   setLoading(true,`${toDelete.length}명 삭제 중...`);
   try{
-    const data=await api({action:'bulkRemoveStudents',students:JSON.stringify(toDelete)});
-    if(data.error&&data.error.includes('알 수 없는')){await sequentialDelete(toDelete);return;}
-    if(data.error){showToast('오류: '+data.error);return;}
-    students=data.students||[]; resetStuFilter(); renderStudentList(); buildGradeFilter();
+    for(let i=0;i<chunks.length;i++){
+      const done=Math.min((i+1)*CHUNK, toDelete.length);
+      setLoading(true,`삭제 중... (${done}/${toDelete.length}명)`);
+      const data=await api({action:'bulkRemoveStudents',students:JSON.stringify(chunks[i])});
+      if(data.error&&data.error.includes('알 수 없는')){await sequentialDelete(toDelete);return;}
+      if(data.error){showToast('오류: '+data.error); if(data.students){students=data.students;resetStuFilter();renderStudentList();buildGradeFilter();} return;}
+      if(data.students) students=data.students;
+    }
+    resetStuFilter(); renderStudentList(); buildGradeFilter();
     showToast(`${toDelete.length}명 삭제 완료`);
   }catch(e){await sequentialDelete(toDelete);}
   finally{setLoading(false);}
@@ -1426,6 +1461,69 @@ function resetStuFilter(){
   stuSearchQuery=''; stuFilterGrade=''; selectedStuKeys.clear();
   const si=document.getElementById('stu-search'); if(si) si.value='';
   const gf=document.getElementById('stu-filter-grade'); if(gf) gf.value='';
+}
+
+let _editOld = null;
+
+function openEditStudent(name, grade, gender){
+  _editOld = { name, grade, gender };
+  const isYear = isDeptYearType();
+  const gradeSel = document.getElementById('edit-grade');
+  const yearInp  = document.getElementById('edit-year');
+  const genderSel= document.getElementById('edit-gender');
+  const nameInp  = document.getElementById('edit-name');
+  const err      = document.getElementById('edit-stu-err');
+
+  if(err) err.textContent='';
+  if(isYear){
+    gradeSel.style.display='none';
+    yearInp.style.display='';
+    yearInp.value = grade;
+  } else {
+    gradeSel.style.display='';
+    yearInp.style.display='none';
+    gradeSel.value = grade;
+  }
+  genderSel.value = gender || '';
+  nameInp.value = name;
+  openModal('edit-stu-modal');
+}
+
+async function saveEditStudent(){
+  if(!_editOld) return;
+  const isYear = isDeptYearType();
+  const name   = document.getElementById('edit-name').value.trim();
+  let   grade  = isYear ? document.getElementById('edit-year').value.trim()
+                        : document.getElementById('edit-grade').value;
+  const gender = document.getElementById('edit-gender').value;
+  const err    = document.getElementById('edit-stu-err');
+
+  if(!name){  if(err) err.textContent='이름을 입력해주세요'; return; }
+  if(!grade){ if(err) err.textContent=isYear?'출생연도를 입력해주세요':'학년을 선택해주세요'; return; }
+
+  // 연도 정규화 (1992→92, 2005→05)
+  if(isYear){
+    let y = parseInt(grade, 10);
+    if(y >= 1900) grade = String(y % 100).padStart(2,'0');
+    else grade = String(y).padStart(2,'0');
+  }
+
+  setLoading(true,'수정 중...');
+  try{
+    const data = await api({
+      action:'editStudent',
+      oldName:_editOld.name, oldGrade:_editOld.grade,
+      name, grade, gender
+    });
+    if(data.duplicate){ if(err) err.textContent='같은 이름·학년의 학생이 이미 있습니다'; return; }
+    if(data.error){ if(err) err.textContent='오류: '+data.error; return; }
+    students = data.students || [];
+    closeModal('edit-stu-modal');
+    resetStuFilter(); renderStudentList(); buildGradeFilter();
+    showToast(`${name} 정보가 수정되었습니다 ✓`);
+  }catch(e){
+    if(err) err.textContent='연결 오류: '+e.message;
+  }finally{ setLoading(false); }
 }
 
 async function removeStudent(name,grade){
@@ -1483,17 +1581,38 @@ function showExcelPreview(){
 }
 async function uploadExcel(){
   const toAdd=parsedXlsx.filter(s=>!s.dup); if(!toAdd.length) return;
-  setLoading(true,`${toAdd.length}명 일괄 등록 중...`);
+  const CHUNK=30;  // URL 길이 제한 방지를 위해 30명씩 분할 전송
+  const chunks=[];
+  for(let i=0;i<toAdd.length;i+=CHUNK) chunks.push(toAdd.slice(i,i+CHUNK));
+
+  let totalAdded=0, totalSkipped=0;
+  setLoading(true,`${toAdd.length}명 등록 준비 중...`);
   try{
-    // ★ gender 포함하여 전송
-    const data=await api({action:'bulkAddStudents', students:JSON.stringify(toAdd.map(s=>({name:s.name,grade:s.grade,gender:s.gender||''})))});
-    if(data.error){showToast('오류: '+data.error);return;}
-    students=data.students||[]; renderStudentList(); buildGradeFilter();
-    showToast(`완료: ${(data.added||[]).length}명 추가`);
-    parsedXlsx=[]; document.getElementById('excel-preview').style.display='none';
+    for(let i=0;i<chunks.length;i++){
+      const done=Math.min((i+1)*CHUNK, toAdd.length);
+      setLoading(true,`등록 중... (${done}/${toAdd.length}명)`);
+      const payload=chunks[i].map(s=>({name:s.name,grade:s.grade,gender:s.gender||''}));
+      const data=await api({action:'bulkAddStudents', students:JSON.stringify(payload)});
+      if(data.error){
+        showToast('오류: '+data.error);
+        if(data.students){ students=data.students; renderStudentList(); buildGradeFilter(); }
+        return;
+      }
+      totalAdded   += (data.added  ||[]).length;
+      totalSkipped += (data.skipped||[]).length;
+      if(data.students) students=data.students;  // 매 응답마다 최신 명단 반영
+    }
+    renderStudentList(); buildGradeFilter();
+    showToast(`완료: ${totalAdded}명 추가${totalSkipped?` · ${totalSkipped}명 중복 제외`:''}`);
+    parsedXlsx=[];
+    document.getElementById('excel-preview').style.display='none';
     document.getElementById('excel-upload-btn').style.display='none';
     document.getElementById('excel-file').value='';
-  }catch(e){showToast('연결 오류: '+e.message);}
+  }catch(e){
+    showToast('연결 오류: '+e.message+'\n등록된 인원을 확인합니다...');
+    // 실패해도 현재까지 등록된 명단 다시 불러오기
+    try{ const d=await api({action:'students'}); students=d.students||[]; renderStudentList(); buildGradeFilter(); }catch(_){}
+  }
   finally{setLoading(false);}
 }
 function downloadTemplate(){
