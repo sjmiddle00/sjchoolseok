@@ -649,14 +649,14 @@ select, input, button { min-width: 0; box-sizing: border-box; }
   </div>
 
   <div class="adm-sec">
-    <div class="adm-sec-ttl">설교제목 · 대표기도자</div>
+    <div class="adm-sec-ttl">설교제목 · 기도인도</div>
     <div class="card" style="margin:0;padding:14px;display:flex;flex-direction:column;gap:10px;">
       <div style="display:flex;align-items:center;gap:10px;">
         <span style="font-size:15px;font-weight:600;color:var(--txt);width:80px;flex-shrink:0;">설교제목</span>
         <input class="sett-inp" id="rpt-sermon" type="text" placeholder="제목 입력" style="flex:1;padding:10px 12px;font-size:15px;"/>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:15px;font-weight:600;color:var(--txt);width:80px;flex-shrink:0;">대표기도자</span>
+        <span style="font-size:15px;font-weight:600;color:var(--txt);width:80px;flex-shrink:0;">기도인도</span>
         <input class="sett-inp" id="rpt-prayer" type="text" placeholder="이름 입력" style="flex:1;padding:10px 12px;font-size:15px;"/>
       </div>
     </div>
@@ -2667,7 +2667,7 @@ function buildReportHTML(data){
   <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
     <tr><td style="${tdBase}background:#f5f5f5;font-weight:600;width:90px;">설교 본문</td><td style="${tdBase}">${passage||'-'}</td></tr>
     <tr><td style="${tdBase}background:#f5f5f5;font-weight:600;">설교 제목</td><td style="${tdBase}">${data.sermon||'-'}</td></tr>
-    <tr><td style="${tdBase}background:#f5f5f5;font-weight:600;">대표기도자</td><td style="${tdBase}">${data.prayer||'-'}</td></tr>
+    <tr><td style="${tdBase}background:#f5f5f5;font-weight:600;">기도인도</td><td style="${tdBase}">${data.prayer||'-'}</td></tr>
   </table>`;
 
   // 출석 현황
