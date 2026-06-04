@@ -277,6 +277,10 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .rpt-load-btn:active{opacity:.8;}
 .rpt-event-card{padding:14px;border-bottom:1px solid var(--bdr);}
 .rpt-event-card:last-child{border-bottom:none;}
+.passage-chip{display:flex;align-items:center;justify-content:space-between;background:var(--pr-pl);border:1.5px solid var(--pr);border-radius:var(--r);padding:9px 12px;margin-bottom:7px;}
+.passage-chip-txt{font-size:14px;font-weight:600;color:var(--pr-dk);}
+.passage-chip-del{width:26px;height:26px;background:#fff;color:var(--rd-fg);border:none;border-radius:50%;font-size:13px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.passage-chip-del:active{opacity:.7;}
 .rpt-event-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
 .rpt-event-label{font-size:13px;font-weight:700;color:var(--pr-dk);}
 .rpt-event-grid{display:flex;flex-direction:column;gap:7px;}
@@ -645,6 +649,8 @@ select, input, button { min-width: 0; box-sizing: border-box; }
         </div>
       </div>
       <div style="text-align:center;font-size:14px;font-weight:600;color:var(--pr-dk);margin-top:10px;min-height:20px;" id="bible-caption"></div>
+      <button class="rpt-add-btn" style="width:100%;margin-top:10px;" onclick="addPassage()">＋ 본문 추가</button>
+      <div id="passage-list" style="margin-top:10px;"></div>
     </div>
   </div>
 
@@ -2160,12 +2166,54 @@ function updateBibleCaption(){
 
 // 나중에 보고서 출력 시 사용할 본문 텍스트 반환 함수
 function getRptPassage(){
+  // 추가된 본문 목록이 있으면 그것들을 합쳐서 반환
+  if(passageList.length > 0){
+    return passageList.map(p=>p.text).join(', ');
+  }
+  // 없으면 현재 드럼 선택값 1개 반환
+  return currentPassageText();
+}
+
+// 현재 드럼에서 선택된 본문 텍스트
+function currentPassageText(){
   const bk=BIBLE[rptBook].n;
   const ch=rptChap+1;
   const v1=rptVs1+1;
   const v2=rptVs2;
   if(v2===''||+v2<=v1) return `${bk} ${ch}:${v1}`;
   return `${bk} ${ch}:${v1}~${v2}`;
+}
+
+// ── ★ 다본문 선택 (본문 추가/삭제) ───────────────────────────
+let passageList = [];  // [{text:'창세기 1:1~5'}, ...]
+let passageCnt = 0;
+
+function addPassage(){
+  const text = currentPassageText();
+  // 중복 방지
+  if(passageList.some(p=>p.text===text)){
+    showToast('이미 추가된 본문입니다');
+    return;
+  }
+  const id = ++passageCnt;
+  passageList.push({ id, text });
+  renderPassageList();
+  showToast(`본문 추가: ${text}`);
+}
+
+function removePassage(id){
+  passageList = passageList.filter(p=>p.id!==id);
+  renderPassageList();
+}
+
+function renderPassageList(){
+  const el = document.getElementById('passage-list');
+  if(!el) return;
+  el.innerHTML = passageList.map(p=>`
+    <div class="passage-chip">
+      <span class="passage-chip-txt">${esc(p.text)}</span>
+      <button class="passage-chip-del" onclick="removePassage(${p.id})">✕</button>
+    </div>`).join('');
 }
 
 
@@ -2227,6 +2275,9 @@ function initRptStats(){
   if(ev) ev.innerHTML = '';
   if(sg) sg.innerHTML = '';
   eventCnt = 0; suggestionCnt = 0;
+  // 설교 본문 목록 초기화
+  passageList = []; passageCnt = 0;
+  renderPassageList();
 }
 
 function addVisitor(gender, data={}){
@@ -2371,6 +2422,7 @@ function collectReportData(){
     savedAt: new Date().toLocaleString('ko-KR'),
     date:  { y:rptY, m:rptM, d:rptD },
     bible: { book:rptBook, chap:rptChap, vs1:rptVs1, vs2:rptVs2 },
+    passages: passageList.map(p=>p.text),
     sermon: document.getElementById('rpt-sermon')?.value||'',
     prayer: document.getElementById('rpt-prayer')?.value||'',
     teacherAttend: document.getElementById('rpt-teacher-attend')?.value||'0',
@@ -2418,6 +2470,9 @@ function applyReportData(draft){
       updateBibleCaption();
     }
   }
+  // 추가된 본문 목록 복원
+  passageList = (draft.passages||[]).map(text=>({ id:++passageCnt, text }));
+  renderPassageList();
   // 텍스트 필드
   const s=document.getElementById('rpt-sermon');
   const p=document.getElementById('rpt-prayer');
