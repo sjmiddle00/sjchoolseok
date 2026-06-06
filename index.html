@@ -682,6 +682,7 @@ select, input, button { min-width: 0; box-sizing: border-box; }
         <span class="rpt-stat-lbl">재적</span>
         <span class="rpt-stat-val" id="rpt-roster">-</span>
         <span class="rpt-stat-unit">명</span>
+        <button class="stat-edit-btn" onclick="editStat('roster')" title="수정">✏️</button>
       </div>
       <div class="rpt-stat-row">
         <span class="rpt-stat-lbl">출석</span>
@@ -2231,13 +2232,13 @@ let visitorCnt = 0;
 
 // ── ★ 날짜 기준 출석 데이터 GAS 조회 ─────────────────────────
 let _fetchRptTimer = null;
-// 수기 수정 여부 추적 (남/여만, true면 자동 동기화가 덮어쓰지 않음)
-let statEdited = { m:false, f:false };
+// 수기 수정 여부 추적 (재적/남/여, true면 자동 동기화가 덮어쓰지 않음)
+let statEdited = { roster:false, m:false, f:false };
 
 function scheduleFetchRptStats(){
   if(_fetchRptTimer) clearTimeout(_fetchRptTimer);
   // 날짜를 바꾸면 새 날짜 기준이므로 수기 수정 해제
-  statEdited = { m:false, f:false };
+  statEdited = { roster:false, m:false, f:false };
   _fetchRptTimer = setTimeout(fetchRptStats, 700); // 드럼 멈추면 700ms 후 조회
 }
 
@@ -2259,9 +2260,11 @@ async function fetchRptStats(){
     const data = await api({action:'recordsByDate', date:dateStr});
     if(data.error) throw new Error(data.error);
     const rec = data.records||[];
+    const elR = document.getElementById('rpt-roster');
     const elM = document.getElementById('rpt-m-attend');
     const elF = document.getElementById('rpt-f-attend');
     // 수기 수정된 항목은 덮어쓰지 않음
+    if(elR && !statEdited.roster){ elR.textContent = students.length; elR.classList.remove('edited'); }
     if(elM && !statEdited.m){ elM.textContent = rec.filter(r=>r.gender==='남').length; elM.classList.remove('edited'); }
     if(elF && !statEdited.f){ elF.textContent = rec.filter(r=>r.gender==='여').length; elF.classList.remove('edited'); }
     recalcAttend();  // 출석 = 남 + 여 자동 계산
@@ -2273,10 +2276,10 @@ async function fetchRptStats(){
   }
 }
 
-// 출석 수치 수기 수정 (남/여만)
+// 출석 수치 수기 수정 (재적/남/여)
 function editStat(type){
-  const map = { m:'rpt-m-attend', f:'rpt-f-attend' };
-  const label = { m:'남(재적)', f:'여(재적)' };
+  const map = { roster:'rpt-roster', m:'rpt-m-attend', f:'rpt-f-attend' };
+  const label = { roster:'재적', m:'남(재적)', f:'여(재적)' };
   const el = document.getElementById(map[type]);
   if(!el) return;
   const cur = parseInt(el.textContent) || 0;
@@ -2287,25 +2290,25 @@ function editStat(type){
   el.textContent = num;
   el.classList.add('edited');     // 초록색으로 수정됨 표시
   statEdited[type] = true;        // 자동 동기화 덮어쓰기 방지
-  recalcAttend();                 // 출석 합계 재계산
+  if(type === 'm' || type === 'f') recalcAttend();  // 남/여 수정 시 출석 합계 재계산
   const note = document.getElementById('rpt-stat-note');
   if(note) note.textContent = '일부 항목 수기 수정됨 (자동 집계 해제)';
 }
 
 // 출석체크 데이터로 다시 동기화 (수기 수정 해제)
 function resyncStats(){
-  statEdited = { m:false, f:false };  // 수기 수정 해제
-  ['rpt-m-attend','rpt-f-attend'].forEach(id=>{
+  statEdited = { roster:false, m:false, f:false };  // 수기 수정 해제
+  ['rpt-roster','rpt-m-attend','rpt-f-attend'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.classList.remove('edited');
   });
   fetchRptStats();  // 선택된 날짜의 출석체크 데이터로 재조회
-  showToast('출석체크 데이터로 동기화했습니다');
+  showToast('등록·출석 데이터로 동기화했습니다');
 }
 
 function initRptStats(){
   // 수기 수정 상태 초기화
-  statEdited = { m:false, f:false };
-  ['rpt-m-attend','rpt-f-attend'].forEach(id=>{
+  statEdited = { roster:false, m:false, f:false };
+  ['rpt-roster','rpt-m-attend','rpt-f-attend'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.classList.remove('edited');
   });
   // 재적: 등록 학생 수 즉시 표시
@@ -2481,6 +2484,7 @@ function collectReportData(){
     passages: passageList.map(p=>p.text),
     statEdited: { ...statEdited },
     statVals: {
+      roster: document.getElementById('rpt-roster')?.textContent||'',
       m: document.getElementById('rpt-m-attend')?.textContent||'',
       f: document.getElementById('rpt-f-attend')?.textContent||''
     },
@@ -2536,17 +2540,17 @@ function applyReportData(draft){
   renderPassageList();
   // 수기 수정된 출석 수치 복원 (자동 동기화 이후에 덮어쓰기 위해 약간 지연)
   if(draft.statEdited){
-    statEdited = { m:!!draft.statEdited.m, f:!!draft.statEdited.f };
+    statEdited = { roster:!!draft.statEdited.roster, m:!!draft.statEdited.m, f:!!draft.statEdited.f };
     setTimeout(()=>{
-      const map={m:'rpt-m-attend',f:'rpt-f-attend'};
-      ['m','f'].forEach(k=>{
+      const map={roster:'rpt-roster',m:'rpt-m-attend',f:'rpt-f-attend'};
+      ['roster','m','f'].forEach(k=>{
         if(statEdited[k] && draft.statVals && draft.statVals[k]!==''){
           const el=document.getElementById(map[k]);
           if(el){ el.textContent=draft.statVals[k]; el.classList.add('edited'); }
         }
       });
       recalcAttend();
-      if(statEdited.m||statEdited.f){
+      if(statEdited.roster||statEdited.m||statEdited.f){
         const note=document.getElementById('rpt-stat-note');
         if(note) note.textContent='일부 항목 수기 수정됨 (자동 집계 해제)';
       }
