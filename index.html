@@ -256,6 +256,9 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .rpt-stat-lbl{font-size:16px;font-weight:600;color:var(--txt);flex:1;}
 .rpt-sub{font-size:12px;color:var(--muted);font-weight:400;margin-left:2px;}
 .rpt-stat-val{font-size:26px;font-weight:700;color:var(--pr-dk);min-width:44px;text-align:right;}
+.rpt-stat-val.edited{color:#1a7a41;}
+.stat-edit-btn{background:none;border:none;font-size:15px;cursor:pointer;margin-left:8px;padding:4px;opacity:.6;}
+.stat-edit-btn:active{opacity:1;}
 .rpt-stat-unit{font-size:14px;color:var(--muted);margin-left:4px;}
 .rpt-stat-note{font-size:11px;color:var(--muted);text-align:center;padding:8px 0 4px;}
 .rpt-visitor-sec{padding:12px 16px;border-top:1px solid var(--bdr);}
@@ -669,7 +672,10 @@ select, input, button { min-width: 0; box-sizing: border-box; }
   </div>
 
   <div class="adm-sec" style="margin-bottom:40px;">
-    <div class="adm-sec-ttl">출석 인원 현황</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div class="adm-sec-ttl" style="margin-bottom:0;">출석 인원 현황</div>
+      <button class="rpt-save-btn" onclick="resyncStats()">↻ 출석 동기화</button>
+    </div>
     <div class="card" style="margin:0;padding:0;overflow:hidden;">
       <!-- 자동 집계 항목 -->
       <div class="rpt-stat-row">
@@ -686,11 +692,13 @@ select, input, button { min-width: 0; box-sizing: border-box; }
         <span class="rpt-stat-lbl">남<span class="rpt-sub">(재적)</span></span>
         <span class="rpt-stat-val" id="rpt-m-attend">-</span>
         <span class="rpt-stat-unit">명</span>
+        <button class="stat-edit-btn" onclick="editStat('m')" title="수정">✏️</button>
       </div>
       <div class="rpt-stat-row">
         <span class="rpt-stat-lbl">여<span class="rpt-sub">(재적)</span></span>
         <span class="rpt-stat-val" id="rpt-f-attend">-</span>
         <span class="rpt-stat-unit">명</span>
+        <button class="stat-edit-btn" onclick="editStat('f')" title="수정">✏️</button>
       </div>
       <div class="rpt-stat-note" id="rpt-stat-note">오늘 출석체크 데이터 기준</div>
       <!-- 남(방문) -->
@@ -2223,9 +2231,22 @@ let visitorCnt = 0;
 
 // ── ★ 날짜 기준 출석 데이터 GAS 조회 ─────────────────────────
 let _fetchRptTimer = null;
+// 수기 수정 여부 추적 (남/여만, true면 자동 동기화가 덮어쓰지 않음)
+let statEdited = { m:false, f:false };
+
 function scheduleFetchRptStats(){
   if(_fetchRptTimer) clearTimeout(_fetchRptTimer);
+  // 날짜를 바꾸면 새 날짜 기준이므로 수기 수정 해제
+  statEdited = { m:false, f:false };
   _fetchRptTimer = setTimeout(fetchRptStats, 700); // 드럼 멈추면 700ms 후 조회
+}
+
+// 출석 = 남(재적) + 여(재적) 자동 계산
+function recalcAttend(){
+  const m = parseInt(document.getElementById('rpt-m-attend')?.textContent) || 0;
+  const f = parseInt(document.getElementById('rpt-f-attend')?.textContent) || 0;
+  const elA = document.getElementById('rpt-attend');
+  if(elA) elA.textContent = m + f;
 }
 
 async function fetchRptStats(){
@@ -2238,20 +2259,55 @@ async function fetchRptStats(){
     const data = await api({action:'recordsByDate', date:dateStr});
     if(data.error) throw new Error(data.error);
     const rec = data.records||[];
-    const elA = document.getElementById('rpt-attend');
     const elM = document.getElementById('rpt-m-attend');
     const elF = document.getElementById('rpt-f-attend');
-    if(elA) elA.textContent = rec.length;
-    if(elM) elM.textContent = rec.filter(r=>r.gender==='남').length;
-    if(elF) elF.textContent = rec.filter(r=>r.gender==='여').length;
+    // 수기 수정된 항목은 덮어쓰지 않음
+    if(elM && !statEdited.m){ elM.textContent = rec.filter(r=>r.gender==='남').length; elM.classList.remove('edited'); }
+    if(elF && !statEdited.f){ elF.textContent = rec.filter(r=>r.gender==='여').length; elF.classList.remove('edited'); }
+    recalcAttend();  // 출석 = 남 + 여 자동 계산
     if(note) note.textContent = `${rptY}년 ${rptM}월 ${rptD}일 출석 기준`;
   }catch(e){
-    ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='-'; });
+    ['rpt-m-attend','rpt-f-attend'].forEach(id=>{ const el=document.getElementById(id); if(el && el.textContent==='…') el.textContent='-'; });
+    const elA=document.getElementById('rpt-attend'); if(elA && elA.textContent==='…') elA.textContent='-';
     if(note) note.textContent = '출석 데이터를 불러올 수 없습니다';
   }
 }
 
+// 출석 수치 수기 수정 (남/여만)
+function editStat(type){
+  const map = { m:'rpt-m-attend', f:'rpt-f-attend' };
+  const label = { m:'남(재적)', f:'여(재적)' };
+  const el = document.getElementById(map[type]);
+  if(!el) return;
+  const cur = parseInt(el.textContent) || 0;
+  const input = prompt(`${label[type]} 인원을 입력하세요`, cur);
+  if(input === null) return;  // 취소
+  const num = parseInt(input);
+  if(isNaN(num) || num < 0){ showToast('0 이상의 숫자를 입력해주세요'); return; }
+  el.textContent = num;
+  el.classList.add('edited');     // 초록색으로 수정됨 표시
+  statEdited[type] = true;        // 자동 동기화 덮어쓰기 방지
+  recalcAttend();                 // 출석 합계 재계산
+  const note = document.getElementById('rpt-stat-note');
+  if(note) note.textContent = '일부 항목 수기 수정됨 (자동 집계 해제)';
+}
+
+// 출석체크 데이터로 다시 동기화 (수기 수정 해제)
+function resyncStats(){
+  statEdited = { m:false, f:false };  // 수기 수정 해제
+  ['rpt-m-attend','rpt-f-attend'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.classList.remove('edited');
+  });
+  fetchRptStats();  // 선택된 날짜의 출석체크 데이터로 재조회
+  showToast('출석체크 데이터로 동기화했습니다');
+}
+
 function initRptStats(){
+  // 수기 수정 상태 초기화
+  statEdited = { m:false, f:false };
+  ['rpt-m-attend','rpt-f-attend'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.classList.remove('edited');
+  });
   // 재적: 등록 학생 수 즉시 표시
   const el_roster = document.getElementById('rpt-roster');
   if(el_roster) el_roster.textContent = students.length;
@@ -2423,6 +2479,11 @@ function collectReportData(){
     date:  { y:rptY, m:rptM, d:rptD },
     bible: { book:rptBook, chap:rptChap, vs1:rptVs1, vs2:rptVs2 },
     passages: passageList.map(p=>p.text),
+    statEdited: { ...statEdited },
+    statVals: {
+      m: document.getElementById('rpt-m-attend')?.textContent||'',
+      f: document.getElementById('rpt-f-attend')?.textContent||''
+    },
     sermon: document.getElementById('rpt-sermon')?.value||'',
     prayer: document.getElementById('rpt-prayer')?.value||'',
     teacherAttend: document.getElementById('rpt-teacher-attend')?.value||'0',
@@ -2473,6 +2534,24 @@ function applyReportData(draft){
   // 추가된 본문 목록 복원
   passageList = (draft.passages||[]).map(text=>({ id:++passageCnt, text }));
   renderPassageList();
+  // 수기 수정된 출석 수치 복원 (자동 동기화 이후에 덮어쓰기 위해 약간 지연)
+  if(draft.statEdited){
+    statEdited = { m:!!draft.statEdited.m, f:!!draft.statEdited.f };
+    setTimeout(()=>{
+      const map={m:'rpt-m-attend',f:'rpt-f-attend'};
+      ['m','f'].forEach(k=>{
+        if(statEdited[k] && draft.statVals && draft.statVals[k]!==''){
+          const el=document.getElementById(map[k]);
+          if(el){ el.textContent=draft.statVals[k]; el.classList.add('edited'); }
+        }
+      });
+      recalcAttend();
+      if(statEdited.m||statEdited.f){
+        const note=document.getElementById('rpt-stat-note');
+        if(note) note.textContent='일부 항목 수기 수정됨 (자동 집계 해제)';
+      }
+    }, 900);
+  }
   // 텍스트 필드
   const s=document.getElementById('rpt-sermon');
   const p=document.getElementById('rpt-prayer');
