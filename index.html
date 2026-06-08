@@ -26,13 +26,13 @@ const DEPARTMENTS = [
   { name: '소년부',  emoji: '⚽', url: 'https://script.google.com/macros/s/AKfycbyplIR2TyvEeaj9K40poXij-Hiyz6YymAJx7ywwFAq-jJBghZLouz3bB6eNI912EKI17A/exec' },
   { name: '중등부',  emoji: '✏️', url: 'https://script.google.com/macros/s/AKfycbzoM5nnStnaeL5zuQljj6dURnE3z3j_R_MywXGAqwBNKz-8AQrUxRy3oZxbTTbjgPxr/exec' },
   { name: '고등부',  emoji: '🎒', url: 'https://script.google.com/macros/s/AKfycbzUnxJqAstX3Ilow3Rs16DL1dw_WnrIESeOMtWdfn6FHCdPyDMqDYCVA9foL0QeLtwV/exec' },
-  { name: '청년부',  emoji: '🌟', url: 'https://script.google.com/macros/s/AKfycbxjv0eEj81GFz1kYpOdPI0oMLBnEShR2shTN1I8OrpkpEd6c5JEz277JzyDh0FRHdF5/exec',  type: 'year' },
   { name: '영어예배부', emoji: '🌍', url: 'https://script.google.com/macros/s/AKfycbxaDXp0ylXb27yv7waPrMOINIvuLTUxp5kNJ7Nve_lbwjSAmdg-0wRQrP1HGgwaRSvrnw/exec', type: 'year' },
+  { name: '청년부',  emoji: '🌟', url: 'https://script.google.com/macros/s/AKfycbxjv0eEj81GFz1kYpOdPI0oMLBnEShR2shTN1I8OrpkpEd6c5JEz277JzyDh0FRHdF5/exec',  type: 'year' },
 ];
 
 // 부서 선택 화면 관리자 비밀번호 (부서 활성화/비활성화 용)
 // ★ 배포 전 원하는 비밀번호로 변경하세요
-const DEPT_ADMIN_PW = '0691';
+const DEPT_ADMIN_PW = '1234';
 
 // ★ 옵저버 스프레드시트 GAS URL (보고자료 통합 전송용)
 // 옵저버 스프레드시트를 만들고 observer.gs를 배포한 후 URL을 입력하세요
@@ -262,6 +262,16 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .dp-unit{font-size:13px;font-weight:700;color:var(--muted);padding:0 2px;flex-shrink:0;}
 .dp-colon{font-size:17px;font-weight:700;color:var(--muted);padding:0 2px;flex-shrink:0;}
 .dp-caption{text-align:center;font-size:13px;color:var(--muted);margin-top:6px;}
+.stat-month-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.stat-month-btn{padding:12px 4px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#fafafa;font-size:14px;font-weight:600;color:var(--txt);cursor:pointer;text-align:center;transition:.12s;}
+.stat-month-btn.on{background:var(--pr);color:#fff;border-color:var(--pr);}
+.stat-table{border-collapse:collapse;width:100%;font-size:13px;background:#fff;}
+.stat-table th,.stat-table td{border:1px solid #d5dae0;padding:7px 9px;text-align:center;white-space:nowrap;}
+.stat-table thead th{background:#1a5276;color:#fff;font-weight:700;position:sticky;top:0;}
+.stat-table tbody th{background:#eaf2f8;color:#1a5276;font-weight:700;}
+.stat-table .stat-sum-col{background:#fdf2e9;color:#b7770d;font-weight:700;}
+.stat-table .stat-avg-row td,.stat-table .stat-avg-row th{background:#eafaf1;color:#1a7a41;font-weight:700;}
+.stat-table .stat-corner{background:#154360;}
 .wt-clear-btn{width:100%;margin-top:8px;padding:8px;background:#fdedec;color:var(--rd-fg);border:1.5px solid #f5c6c2;border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;}
 .wt-clear-btn:active{opacity:.75;}
 .dp-group-disabled{opacity:.3;pointer-events:none;}
@@ -403,6 +413,7 @@ select, input, button { min-width: 0; box-sizing: border-box; }
     </div>
     <div class="dept-grid" id="dept-grid"></div>
     <button class="dept-admin-link" onclick="showDeptAdminPw()">⚙ 관리자 · 부서 설정</button>
+    <button class="dept-admin-link" onclick="openStatsScreen()" style="margin-top:8px;">📊 교육부 출석 통계 자료</button>
   </div>
 </div>
 
@@ -424,6 +435,7 @@ select, input, button { min-width: 0; box-sizing: border-box; }
     <div class="lbl" id="sel-label">학년 · 이름 선택</div>
     <div class="sel-row">
       <select id="grade-sel" onchange="onGradeChange()"><option value="">전체</option></select>
+      <select id="cls-sel" onchange="onClsChange()" style="display:none;"><option value="">전체 반</option></select>
       <select id="name-sel"  onchange="onNameChange()"><option value="">이름 선택...</option></select>
     </div>
     <button class="bulk-toggle-btn" id="bulk-toggle-btn" onclick="toggleBulkMode()">☑️ 여러 명 한번에 출석체크</button>
@@ -435,8 +447,9 @@ select, input, button { min-width: 0; box-sizing: border-box; }
       <div class="lbl" style="margin:0;">일괄 출석 선택 <span id="bulk-sel-cnt" style="color:var(--pr);font-weight:700;"></span></div>
       <button onclick="toggleBulkAllVisible()" id="bulk-all-btn" style="background:var(--pr-pl);color:var(--pr-dk);border:none;border-radius:20px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer;">전체 선택</button>
     </div>
-    <div class="bulk-grade-row">
-      <select id="bulk-grade-sel" onchange="renderBulkList()"><option value="">전체 학년</option></select>
+    <div class="bulk-grade-row" style="display:flex;gap:8px;">
+      <select id="bulk-grade-sel" onchange="renderBulkList()" style="flex:1;"><option value="">전체 학년</option></select>
+      <select id="bulk-cls-sel" onchange="renderBulkList()" style="flex:1;display:none;"><option value="">전체 반</option></select>
     </div>
     <div id="bulk-list" class="bulk-list"></div>
     <button class="single-btn off" id="bulk-sub-btn" onclick="doBulkSubmit()" style="margin-top:12px;">
@@ -486,6 +499,8 @@ select, input, button { min-width: 0; box-sizing: border-box; }
           <option>중1</option><option>중2</option><option>중3</option>
           <option>고1</option><option>고2</option><option>고3</option>
         </select>
+        <input class="inp" id="new-cls" type="text" placeholder="반" style="width:70px;min-width:50px;flex:0 0 70px;"
+               onkeydown="if(event.key==='Enter')addStudent()"/>
         <select class="gender-sel" id="new-gender-grade">
           <option value="">성별</option>
           <option value="남">남</option>
@@ -499,6 +514,8 @@ select, input, button { min-width: 0; box-sizing: border-box; }
       <div class="add-row" id="year-add-row" style="display:none">
         <input class="inp" id="new-year" type="number" placeholder="출생연도 (예: 92)"
                style="width:130px;min-width:80px;flex-shrink:1;flex:0 1 130px" min="1" max="2099"
+               onkeydown="if(event.key==='Enter')addStudent()"/>
+        <input class="inp" id="new-cls-year" type="text" placeholder="반" style="width:60px;min-width:45px;flex:0 0 60px;"
                onkeydown="if(event.key==='Enter')addStudent()"/>
         <select class="gender-sel" id="new-gender-year">
           <option value="">성별</option>
@@ -515,7 +532,7 @@ select, input, button { min-width: 0; box-sizing: border-box; }
   <div class="adm-sec">
     <div class="adm-sec-ttl">엑셀 일괄 등록</div>
     <div class="card">
-      <p class="excel-desc" id="excel-desc"><b>A열: 이름 / B열: 학년 / C열: 성별</b> 형식의 엑셀 파일을 업로드하세요.</p>
+      <p class="excel-desc" id="excel-desc"><b>A열: 이름 / B열: 학년 / C열: 성별 / D열: 반</b> 형식의 엑셀 파일을 업로드하세요.</p>
       <div class="excel-btns">
         <label class="excel-select-btn" for="excel-file">📂 엑셀 파일 선택</label>
         <button class="excel-tpl-btn" onclick="downloadTemplate()">📋 샘플 양식</button>
@@ -625,6 +642,45 @@ select, input, button { min-width: 0; box-sizing: border-box; }
 </div>
 
 <!-- ════════════ 보고자료 화면 ════════════ -->
+<!-- ════════════ 교육부 출석 통계 화면 ════════════ -->
+<div id="s-stats" class="screen">
+  <div class="adm-hdr" style="background:#1a5276;">
+    <button class="back-btn" onclick="closeStatsScreen()">←</button>
+    <h2>📊 교육부 출석 통계</h2>
+  </div>
+
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">연도 선택</div>
+    <div class="card" style="margin:0 0 16px;padding:10px 8px;">
+      <div class="dp-wrap" style="margin:0;padding:0;box-shadow:none;background:none;border-radius:0;justify-content:center;">
+        <div class="dp-group">
+          <div class="dp-col" id="dp-stat-year"></div>
+          <div class="dp-unit">년</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="adm-sec-ttl">월 선택 (복수 선택 가능)</div>
+    <div class="card" style="margin:0 0 16px;padding:14px;">
+      <div class="stat-month-grid" id="stat-month-grid"></div>
+    </div>
+
+    <button class="single-btn off" id="stat-gen-btn" onclick="generateStats()" style="margin-bottom:20px;">
+      <span class="sb-icon">📊</span>
+      통계 자료 생성
+      <div class="sb-sub" id="stat-gen-sub">월을 선택하세요</div>
+    </button>
+
+    <div id="stat-result" style="display:none;">
+      <div class="rec-hdr" style="margin-bottom:10px;">
+        <div class="lbl" style="margin:0;">통계 결과</div>
+        <button class="rpt-save-btn" onclick="downloadStatsExcel()">📥 엑셀 다운로드</button>
+      </div>
+      <div id="stat-table-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;"></div>
+    </div>
+  </div>
+</div>
+
 <div id="s-report" class="screen">
   <div class="adm-hdr" style="background:#1a5276;">
     <button class="back-btn" onclick="goMain()">←</button>
@@ -861,6 +917,9 @@ select, input, button { min-width: 0; box-sizing: border-box; }
       </select>
       <input class="inp" id="edit-year" type="number" placeholder="출생연도 (예: 92)" min="1" max="2099"
              style="display:none;width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);"/>
+      <input class="inp" id="edit-cls" type="text" placeholder="반 (선택)"
+             style="display:none;width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);"
+             onkeydown="if(event.key==='Enter')saveEditStudent()"/>
       <select class="gender-sel" id="edit-gender" style="width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);">
         <option value="">성별 선택</option>
         <option value="남">남</option>
@@ -1109,10 +1168,13 @@ function selectDept(dept, showLoading=true){
   document.getElementById('dept-tag').textContent = dept.name;
   document.getElementById('admin-dept-label').textContent = '· ' + dept.name;
 
-  // ★ 부서 유형에 따라 학년 선택창 즉시 숨김/표시
+  // ★ 부서 유형에 따라 학년/반 선택창 즉시 숨김/표시
   const isYear = dept.type === 'year';
   document.getElementById('grade-sel').style.display = isYear ? 'none' : '';
-  document.getElementById('sel-label').textContent   = isYear ? '이름 선택' : '학년 · 이름 선택';
+  const useCls = (dept.name !== '청년부');
+  document.getElementById('sel-label').textContent   = isYear ? (useCls ? '반 · 이름 선택' : '이름 선택') : '학년 · 반 · 이름 선택';
+  const clsSelEl = document.getElementById('cls-sel');
+  if(clsSelEl) clsSelEl.style.display = useCls ? '' : 'none';
 
   showScreen('s-main');
 
@@ -1274,7 +1336,7 @@ function renderRecords(records, showTime){
       rightSide = `<span class="badge ${r.status==='출석'?'bp':'bl'}">${esc(r.status)}</span>`;
     }
     return `<div class="rec-row${r._pending?' rec-pending':''}">
-      <div><div class="r-name">${esc(dispName(r))}</div><div class="r-meta">${esc(r.grade)}</div></div>
+      <div><div class="r-name">${esc(dispName(r))}</div><div class="r-meta">${esc(r.grade)}${(useClass()&&r.cls)?' · '+esc(r.cls)+'반':''}</div></div>
       ${rightSide}
     </div>`;
   }).join('');
@@ -1285,6 +1347,10 @@ function renderRecords(records, showTime){
 // 현재 부서가 출생연도 방식인지 여부
 function isDeptYearType(){
   return !!(currentDept && currentDept.type === 'year');
+}
+// 반(클래스) 사용 부서 여부 — 청년부만 반 미사용, 나머지 전 부서 반 사용
+function useClass(){
+  return !!(currentDept && currentDept.name !== '청년부');
 }
 
 // 이름 표시: 연도제 부서는 "이름(연도)", 학년제는 "이름"
@@ -1305,7 +1371,7 @@ function koreanSort(arr){
 function buildGradeFilter(){
   const gradeSel = document.getElementById('grade-sel');
   if (isDeptYearType()){
-    // 연도제 부서: 학년 필터 숨김
+    // 연도제 부서: 학년 필터는 숨김 (반 필터는 buildClsFilter가 useClass 기준으로 처리)
     gradeSel.style.display = 'none';
     onGradeChange();
     return;
@@ -1315,12 +1381,26 @@ function buildGradeFilter(){
   const prev=gradeSel.value;
   gradeSel.innerHTML='<option value="">전체</option>';
   grades.forEach(g=>{ const o=document.createElement('option'); o.value=g; o.textContent=g; if(g===prev)o.selected=true; gradeSel.appendChild(o); });
-  onGradeChange();
+  onGradeChange();  // 내부에서 buildClsFilter + fillNameOptions 호출
 }
 function onGradeChange(){
+  // 학년 변경 시 반 목록 갱신 후 이름 채우기
+  buildClsFilter();
+  fillNameOptions();
+}
+
+// 반 선택 변경 시 이름 채우기
+function onClsChange(){
+  fillNameOptions();
+}
+
+// 현재 학년/반 필터에 맞는 이름 목록 채우기
+function fillNameOptions(){
   const grade = isDeptYearType() ? '' : document.getElementById('grade-sel').value;
-  const filtered = grade ? students.filter(s=>s.grade===grade) : students;
-  // ★ 항상 가나다 순 정렬
+  const cls   = useClass() ? (document.getElementById('cls-sel')?.value || '') : '';
+  let filtered = students.slice();
+  if(grade) filtered = filtered.filter(s=>s.grade===grade);
+  if(cls)   filtered = filtered.filter(s=>(s.cls||'')===cls);
   const sorted = koreanSort(filtered);
   const sel = document.getElementById('name-sel');
   const prev = sel.value;
@@ -1328,11 +1408,30 @@ function onGradeChange(){
   sorted.forEach(s=>{
     const o=document.createElement('option');
     o.value=s.name;
-    o.textContent=dispName(s);  // 연도제: "이름(연도)"
+    o.textContent=dispName(s);
     if(s.name===prev) o.selected=true;
     sel.appendChild(o);
   });
   updateSubBtn();
+}
+
+// 현재 선택된 학년에 해당하는 반 목록 채우기
+function buildClsFilter(){
+  const clsSel = document.getElementById('cls-sel');
+  if(!clsSel) return;
+  if(!useClass()){ clsSel.style.display='none'; return; }
+  clsSel.style.display='';
+  // 연도제 부서는 학년 구분이 없으므로 전체 반, 학년제는 선택 학년의 반
+  const grade = isDeptYearType() ? '' : document.getElementById('grade-sel').value;
+  let pool = students;
+  if(grade) pool = students.filter(s=>s.grade===grade);
+  const classes = [...new Set(pool.map(s=>s.cls).filter(Boolean))]
+    .sort((a,b)=>String(a).localeCompare(String(b),'ko',{numeric:true}));
+  const prev = clsSel.value;
+  clsSel.innerHTML='<option value="">전체 반</option>';
+  classes.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c+'반'; if(c===prev)o.selected=true; clsSel.appendChild(o); });
+  // 반이 하나도 없으면 숨김
+  if(classes.length===0) clsSel.style.display='none';
 }
 function onNameChange(){ updateSubBtn(); }
 
@@ -1355,6 +1454,7 @@ function doSubmit(){
   const found = students.find(s=>s.name===name) || {};
   const grade = found.grade || '';
   const gender = found.gender || '';
+  const cls = found.cls || '';
   if (!name) return;
 
   const mode = getAttendanceMode();
@@ -1373,7 +1473,7 @@ function doSubmit(){
   // ① 화면 즉시 반영 (낙관적)
   const now = new Date();
   const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  const optimisticRec = { name, grade, gender, status, time:timeStr, _pending:true };
+  const optimisticRec = { name, grade, gender, cls, status, time:timeStr, _pending:true };
   const newRecords = [...cached, optimisticRec];
   setCache(newRecords);
   renderRecords(newRecords, true);
@@ -1381,7 +1481,7 @@ function doSubmit(){
   resetForm();
 
   // ② 저장 큐에 추가 → 백그라운드 순차 처리
-  _saveQueue.push({ name, grade, gender, status, retries:0 });
+  _saveQueue.push({ name, grade, gender, cls, status, retries:0 });
   _pendingCount++;
   updatePendingBadge();
   runSaveQueue();
@@ -1413,18 +1513,39 @@ function buildBulkGradeFilter(){
   grades.sort((a,b)=>String(a).localeCompare(String(b),'ko',{numeric:true}));
   sel.innerHTML = '<option value="">전체 학년</option>' +
     grades.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');
+  buildBulkClsFilter();
+}
+
+// 일괄 패널의 반 필터 채우기 (선택 학년 기준)
+function buildBulkClsFilter(){
+  const clsSel = document.getElementById('bulk-cls-sel');
+  if(!clsSel) return;
+  if(!useClass()){ clsSel.style.display='none'; return; }
+  const grade = document.getElementById('bulk-grade-sel')?.value || '';
+  let pool = students;
+  if(grade) pool = students.filter(s=>s.grade===grade);
+  const classes = [...new Set(pool.map(s=>s.cls).filter(Boolean))]
+    .sort((a,b)=>String(a).localeCompare(String(b),'ko',{numeric:true}));
+  const prev = clsSel.value;
+  clsSel.innerHTML = '<option value="">전체 반</option>' +
+    classes.map(c=>`<option value="${esc(c)}"${c===prev?' selected':''}>${esc(c)}반</option>`).join('');
+  clsSel.style.display = classes.length>0 ? '' : 'none';
 }
 
 // 일괄 출석 학생 리스트 렌더 (이미 출석한 학생은 비활성)
 function renderBulkList(){
   const el = document.getElementById('bulk-list');
   if(!el) return;
+  // 학년이 바뀌었을 수 있으니 반 목록 갱신
+  buildBulkClsFilter();
   const gradeFilter = document.getElementById('bulk-grade-sel')?.value || '';
+  const clsFilter   = useClass() ? (document.getElementById('bulk-cls-sel')?.value || '') : '';
   const cached = getCache();
   const doneKeys = new Set(cached.map(r=>r.name+'__'+r.grade));
 
   let list = students.slice();
   if(gradeFilter) list = list.filter(s=>s.grade===gradeFilter);
+  if(clsFilter)   list = list.filter(s=>(s.cls||'')===clsFilter);
   // 이름 정렬
   list.sort((a,b)=>String(a.name).localeCompare(String(b.name),'ko'));
 
@@ -1434,6 +1555,7 @@ function renderBulkList(){
     const key = s.name+'__'+s.grade;
     const done = doneKeys.has(key);
     const checked = bulkSelected.has(key);
+    const clsTag = (useClass() && s.cls) ? ` · ${esc(s.cls)}반` : '';
     if(done){
       return `<div class="bulk-item done">
         <input type="checkbox" disabled/>
@@ -1444,7 +1566,7 @@ function renderBulkList(){
     return `<div class="bulk-item${checked?' checked':''}" onclick="toggleBulkItem('${esc(key)}')">
       <input type="checkbox" ${checked?'checked':''}/>
       <span class="bulk-item-name">${esc(dispName(s))}</span>
-      <span class="bulk-item-grade">${esc(s.grade)}</span>
+      <span class="bulk-item-grade">${esc(s.grade)}${clsTag}</span>
     </div>`;
   }).join('');
   updateBulkCnt();
@@ -1459,10 +1581,12 @@ function toggleBulkItem(key){
 // 현재 보이는 학생 전체 선택/해제
 function toggleBulkAllVisible(){
   const gradeFilter = document.getElementById('bulk-grade-sel')?.value || '';
+  const clsFilter   = useClass() ? (document.getElementById('bulk-cls-sel')?.value || '') : '';
   const cached = getCache();
   const doneKeys = new Set(cached.map(r=>r.name+'__'+r.grade));
   let list = students.slice();
   if(gradeFilter) list = list.filter(s=>s.grade===gradeFilter);
+  if(clsFilter)   list = list.filter(s=>(s.cls||'')===clsFilter);
   // 아직 출석 안 한 학생만 대상
   const selectable = list.filter(s=>!doneKeys.has(s.name+'__'+s.grade)).map(s=>s.name+'__'+s.grade);
   const allSelected = selectable.length>0 && selectable.every(k=>bulkSelected.has(k));
@@ -1513,10 +1637,11 @@ function doBulkSubmit(){
     const grade = key.slice(idx+2);
     const found = students.find(s=>s.name===name && s.grade===grade) || {};
     const gender = found.gender || '';
+    const cls = found.cls || '';
     // 화면 즉시 반영
-    newRecords.push({ name, grade, gender, status, time:timeStr, _pending:true });
+    newRecords.push({ name, grade, gender, cls, status, time:timeStr, _pending:true });
     // 저장 큐에 추가
-    _saveQueue.push({ name, grade, gender, status, retries:0 });
+    _saveQueue.push({ name, grade, gender, cls, status, retries:0 });
     _pendingCount++;
     added++;
   });
@@ -1544,7 +1669,7 @@ async function runSaveQueue(){
   while (_saveQueue.length > 0){
     const job = _saveQueue[0];
     try{
-      const data = await api({action:'submit', name:job.name, grade:job.grade, gender:job.gender, status:job.status});
+      const data = await api({action:'submit', name:job.name, grade:job.grade, gender:job.gender, cls:job.cls||'', status:job.status});
 
       if (data.duplicate){
         // 서버에 이미 있는 경우: 정상 처리로 간주하고 큐에서 제거
@@ -1658,18 +1783,22 @@ async function addStudent(){
   const gender = isYear
     ? document.getElementById('new-gender-year').value
     : document.getElementById('new-gender-grade').value;
+  const cls = useClass()
+    ? (isYear ? document.getElementById('new-cls-year').value.trim()
+              : document.getElementById('new-cls').value.trim())
+    : '';
 
   if (!name){ showToast('이름을 입력해주세요'); return; }
   if (!grade){ showToast(isYear ? '출생연도를 입력해주세요' : '학년을 선택해주세요'); return; }
 
   setLoading(true,'추가 중...');
   try{
-    const data=await api({action:'addStudent', name, grade, gender});
+    const data=await api({action:'addStudent', name, grade, gender, cls});
     if(data.duplicate){ document.getElementById('dup-student-name').textContent=`${name} (${grade})`; openModal('dup-student-modal'); return; }
     if(data.error){showToast('오류: '+data.error);return;}
     students=data.students||[]; renderStudentList(); buildGradeFilter();
-    if(isYear){ document.getElementById('new-name-year').value=''; document.getElementById('new-year').value=''; document.getElementById('new-gender-year').value=''; }
-    else      { document.getElementById('new-name').value=''; document.getElementById('new-grade').value=''; document.getElementById('new-gender-grade').value=''; }
+    if(isYear){ document.getElementById('new-name-year').value=''; document.getElementById('new-year').value=''; document.getElementById('new-gender-year').value=''; const cy=document.getElementById('new-cls-year'); if(cy) cy.value=''; }
+    else      { document.getElementById('new-name').value=''; document.getElementById('new-grade').value=''; document.getElementById('new-gender-grade').value=''; document.getElementById('new-cls').value=''; }
     showToast(`${name} 추가 완료 ✓`);
   }catch(e){showToast('연결 오류: '+e.message);}
   finally{setLoading(false);}
@@ -1750,10 +1879,10 @@ function renderStudentList(){
                onclick="event.stopPropagation();toggleStuSelect(this.closest('.stu-item').dataset.key)"/>
         <div>
           <div class="stu-name">${esc(s.name)}</div>
-          <span class="stu-grade">${isDeptYearType()?(s.grade+'년생'):esc(s.grade)}${s.gender?' · '+esc(s.gender):''}</span>
+          <span class="stu-grade">${isDeptYearType()?(s.grade+'년생'):esc(s.grade)}${(useClass()&&s.cls)?' · '+esc(s.cls)+'반':''}${s.gender?' · '+esc(s.gender):''}</span>
         </div>
       </div>
-      <button class="edit-btn" onclick="event.stopPropagation();openEditStudent('${esc(s.name)}','${esc(s.grade)}','${esc(s.gender||'')}')">✏️</button>
+      <button class="edit-btn" onclick="event.stopPropagation();openEditStudent('${esc(s.name)}','${esc(s.grade)}','${esc(s.gender||'')}','${esc(s.cls||'')}')">✏️</button>
     </div>`;
   }).join('');
   updateBulkDeleteBtn(); updateSelectAllState();
@@ -1804,11 +1933,12 @@ function resetStuFilter(){
 
 let _editOld = null;
 
-function openEditStudent(name, grade, gender){
-  _editOld = { name, grade, gender };
+function openEditStudent(name, grade, gender, cls){
+  _editOld = { name, grade, gender, cls:cls||'' };
   const isYear = isDeptYearType();
   const gradeSel = document.getElementById('edit-grade');
   const yearInp  = document.getElementById('edit-year');
+  const clsInp   = document.getElementById('edit-cls');
   const genderSel= document.getElementById('edit-gender');
   const nameInp  = document.getElementById('edit-name');
   const err      = document.getElementById('edit-stu-err');
@@ -1823,6 +1953,11 @@ function openEditStudent(name, grade, gender){
     yearInp.style.display='none';
     gradeSel.value = grade;
   }
+  // 반 입력: 청년부 제외 전 부서 표시
+  if(clsInp){
+    if(useClass()){ clsInp.style.display=''; clsInp.value = cls||''; }
+    else { clsInp.style.display='none'; clsInp.value=''; }
+  }
   genderSel.value = gender || '';
   nameInp.value = name;
   openModal('edit-stu-modal');
@@ -1835,6 +1970,7 @@ async function saveEditStudent(){
   let   grade  = isYear ? document.getElementById('edit-year').value.trim()
                         : document.getElementById('edit-grade').value;
   const gender = document.getElementById('edit-gender').value;
+  const cls    = useClass() ? document.getElementById('edit-cls').value.trim() : '';
   const err    = document.getElementById('edit-stu-err');
 
   if(!name){  if(err) err.textContent='이름을 입력해주세요'; return; }
@@ -1852,7 +1988,7 @@ async function saveEditStudent(){
     const data = await api({
       action:'editStudent',
       oldName:_editOld.name, oldGrade:_editOld.grade,
-      name, grade, gender
+      name, grade, gender, cls
     });
     if(data.duplicate){ if(err) err.textContent='같은 이름·학년의 학생이 이미 있습니다'; return; }
     if(data.error){ if(err) err.textContent='오류: '+data.error; return; }
@@ -1896,8 +2032,10 @@ function onExcelFile(event){
         // ★ C열에서 성별 읽기 (남/여, 남자/여자 모두 허용)
         const rawGender=String(rows[i][2]||'').trim();
         const gender = rawGender.startsWith('남') ? '남' : rawGender.startsWith('여') ? '여' : '';
+        // ★ D열에서 반 읽기 (학년제 부서만)
+        const cls = useClass() ? String(rows[i][3]||'').trim() : '';
         if(!name) continue;
-        parsedXlsx.push({name, grade, gender, dup:existSet.has(`${name}__${grade}`)});
+        parsedXlsx.push({name, grade, gender, cls, dup:existSet.has(`${name}__${grade}`)});
       }
       showExcelPreview();
     }catch(err){showToast('파일 읽기 오류: '+err.message);}
@@ -1912,7 +2050,7 @@ function showExcelPreview(){
   plist.innerHTML=parsedXlsx.map(s=>`
     <div class="excel-preview-row ${s.dup?'dup':''}">
       <span class="pr-name">${esc(s.name)}</span>
-      <span class="pr-grade">${esc(s.grade)}${s.gender?' · '+esc(s.gender):''}${s.dup?' ✓':''}</span>
+      <span class="pr-grade">${esc(s.grade)}${(useClass()&&s.cls)?' · '+esc(s.cls)+'반':''}${s.gender?' · '+esc(s.gender):''}${s.dup?' ✓':''}</span>
     </div>`).join('');
   preview.style.display='block';
   if(newCount>0){btn.style.display='block';btn.textContent=`신규 ${newCount}명 일괄 등록하기`;}
@@ -1930,7 +2068,7 @@ async function uploadExcel(){
     for(let i=0;i<chunks.length;i++){
       const done=Math.min((i+1)*CHUNK, toAdd.length);
       setLoading(true,`등록 중... (${done}/${toAdd.length}명)`);
-      const payload=chunks[i].map(s=>({name:s.name,grade:s.grade,gender:s.gender||''}));
+      const payload=chunks[i].map(s=>({name:s.name,grade:s.grade,gender:s.gender||'',cls:s.cls||''}));
       const data=await api({action:'bulkAddStudents', students:JSON.stringify(payload)});
       if(data.error){
         showToast('오류: '+data.error);
@@ -1964,16 +2102,25 @@ function downloadTemplate(){
   };
 
   if (isYear) {
-    const ws = XLSX.utils.aoa_to_sheet([['이름','출생연도','성별'],['홍길동','92','남'],['김영희','2005','여']]);
-    ws['!cols'] = [{wch:14},{wch:12},{wch:8}];
+    const useCls = (currentDept?.name !== '청년부');
+    let header, sample1, sample2, cols;
+    if(useCls){
+      header=['이름','출생연도','성별','반']; sample1=['홍길동','92','남','1']; sample2=['김영희','2005','여','2'];
+      cols=[{wch:14},{wch:12},{wch:8},{wch:8}];
+    } else {
+      header=['이름','출생연도','성별']; sample1=['홍길동','92','남']; sample2=['김영희','2005','여'];
+      cols=[{wch:14},{wch:12},{wch:8}];
+    }
+    const ws = XLSX.utils.aoa_to_sheet([header, sample1, sample2]);
+    ws['!cols'] = cols;
     ws['!dataValidations'] = [genderDV];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '명단');
     XLSX.writeFile(wb, (currentDept?.name||'')+'_명단_양식.xlsx');
   } else {
     const grades = DEPT_GRADES[currentDept?.name] || ['초1','초2','초3','초4','초5','초6','중1','중2','중3','고1','고2','고3'];
-    const ws = XLSX.utils.aoa_to_sheet([['이름','학년','성별'],['홍길동', grades[0], '남']]);
-    ws['!cols'] = [{wch:14},{wch:10},{wch:8}];
+    const ws = XLSX.utils.aoa_to_sheet([['이름','학년','성별','반'],['홍길동', grades[0], '남', '1']]);
+    ws['!cols'] = [{wch:14},{wch:10},{wch:8},{wch:8}];
     ws['!dataValidations'] = [
       { sqref:'B2:B1000', type:'list', formula1:'"'+grades.join(',') + '"',
         showDropDown:false, showErrorMessage:true, errorStyle:'stop',
@@ -2045,9 +2192,15 @@ function goAdmin(){
 
   // ★ 엑셀 설명 문구 변경
   const desc = document.getElementById('excel-desc');
-  if(desc) desc.innerHTML = isYear
-    ? '<b>A열: 이름 / B열: 출생연도 / C열: 성별</b> (예: 92, 2005) 형식의 엑셀 파일을 업로드하세요.'
-    : '<b>A열: 이름 / B열: 학년 / C열: 성별</b> 형식의 엑셀 파일을 업로드하세요.';
+  if(desc){
+    if(isYear){
+      desc.innerHTML = (currentDept?.name !== '청년부')
+        ? '<b>A열: 이름 / B열: 출생연도 / C열: 성별 / D열: 반</b> (예: 92, 2005) 형식의 엑셀 파일을 업로드하세요. (반은 선택)'
+        : '<b>A열: 이름 / B열: 출생연도 / C열: 성별</b> (예: 92, 2005) 형식의 엑셀 파일을 업로드하세요.';
+    } else {
+      desc.innerHTML = '<b>A열: 이름 / B열: 학년 / C열: 성별 / D열: 반</b> 형식의 엑셀 파일을 업로드하세요. (반은 선택)';
+    }
+  }
 }
 function goMain(){ showScreen('s-main'); window.scrollTo(0,0); }
 
@@ -3094,6 +3247,230 @@ function changeDept(){
 document.querySelectorAll('.overlay').forEach(el=>el.addEventListener('click',e=>{ if(e.target===el) el.classList.remove('show'); }));
 // 부서 관리 오버레이 바깥 탭으로 닫기
 document.getElementById('dept-admin-overlay').addEventListener('click',function(e){ if(e.target===this) this.classList.remove('show'); });
+
+// ══════════════════════════════════════════════════════════════
+// ★ 교육부 출석 통계
+// ══════════════════════════════════════════════════════════════
+// 표 컬럼 순서 (요청 순서: 영유아·유치·유년·소년·중등·고등·영어·청년)
+const STAT_DEPT_ORDER = ['영유아부','유치부','유년부','소년부','중등부','고등부','영어예배부','청년부'];
+const STAT_DEPT_SHORT = {'영유아부':'영유아','유치부':'유치','유년부':'유년','소년부':'소년','중등부':'중등','고등부':'고등','영어예배부':'영어','청년부':'청년'};
+let statYear = new Date().getFullYear();
+let statMonths = new Set();   // 선택된 월 (1~12)
+let statDrumY = null;
+let statResultData = null;    // 생성된 통계 데이터 보관 (엑셀용)
+
+function openStatsScreen(){
+  showScreen('s-stats');
+  window.scrollTo(0,0);
+  statYear = new Date().getFullYear();
+  statMonths.clear();
+  // 연도 드럼 생성 (현재년 기준 ±3년)
+  const years = [];
+  for(let y=statYear-3; y<=statYear+1; y++) years.push(String(y));
+  if(!statDrumY){
+    statDrumY = createDrum('dp-stat-year', years, String(statYear), v=>{ statYear=+v; });
+  } else {
+    statDrumY.reload(years, false);
+    statDrumY.setVal(String(statYear));
+  }
+  renderMonthGrid();
+  document.getElementById('stat-result').style.display='none';
+  updateStatGenBtn();
+}
+
+function closeStatsScreen(){
+  showScreen('s-dept');
+  window.scrollTo(0,0);
+}
+
+function renderMonthGrid(){
+  const grid = document.getElementById('stat-month-grid');
+  if(!grid) return;
+  let html='';
+  for(let m=1; m<=12; m++){
+    const on = statMonths.has(m);
+    html += `<button class="stat-month-btn${on?' on':''}" onclick="toggleStatMonth(${m})">${m}월</button>`;
+  }
+  grid.innerHTML = html;
+}
+
+function toggleStatMonth(m){
+  if(statMonths.has(m)) statMonths.delete(m);
+  else statMonths.add(m);
+  renderMonthGrid();
+  updateStatGenBtn();
+}
+
+function updateStatGenBtn(){
+  const btn = document.getElementById('stat-gen-btn');
+  const sub = document.getElementById('stat-gen-sub');
+  const n = statMonths.size;
+  if(btn) btn.className = n>0 ? 'single-btn on' : 'single-btn off';
+  if(sub) sub.textContent = n>0 ? `${n}개 월 선택됨` : '월을 선택하세요';
+}
+
+// 해당 연/월의 일요일 날짜 목록 반환 ['YYYY-MM-DD', ...]
+function getSundaysOfMonth(year, month){
+  const result = [];
+  const d = new Date(year, month-1, 1);
+  while(d.getMonth() === month-1){
+    if(d.getDay() === 0){
+      result.push(`${year}-${String(month).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+    }
+    d.setDate(d.getDate()+1);
+  }
+  return result;
+}
+
+async function generateStats(){
+  if(statMonths.size===0){ showToast('월을 하나 이상 선택해주세요'); return; }
+  setLoading(true,'각 부서 데이터를 불러오는 중...');
+  try{
+    const months = [...statMonths].sort((a,b)=>a-b);
+    // 부서별로 선택된 모든 월의 데이터를 병렬 요청
+    // 결과 구조: deptData[부서명][날짜] = 출석인원
+    const deptData = {};
+    const tasks = [];
+    STAT_DEPT_ORDER.forEach(deptName=>{
+      const dept = DEPARTMENTS.find(d=>d.name===deptName);
+      if(!dept) return;
+      const url = localStorage.getItem('ch_scriptUrl_'+dept.name) || dept.url;
+      deptData[deptName] = {};
+      months.forEach(m=>{
+        tasks.push(
+          fetchMonthForDept(url, statYear, m)
+            .then(byDate=>{ Object.assign(deptData[deptName], byDate); })
+            .catch(()=>{ /* 한 부서 실패해도 무시(빈칸 처리) */ })
+        );
+      });
+    });
+    await Promise.all(tasks);
+
+    // 날짜 목록 = 선택한 월들의 일요일 + 실제 출석 기록이 있는 날짜 (합집합)
+    let dateSet = new Set();
+    months.forEach(m=>{ getSundaysOfMonth(statYear, m).forEach(d=>dateSet.add(d)); });
+    // 실제 데이터가 있는 날짜도 추가 (일요일이 아닌 특별예배 등)
+    STAT_DEPT_ORDER.forEach(dn=>{
+      if(deptData[dn]) Object.keys(deptData[dn]).forEach(d=>dateSet.add(d));
+    });
+    let dates = [...dateSet].sort();
+
+    statResultData = { year:statYear, months, dates, deptData };
+    renderStatTable();
+    document.getElementById('stat-result').style.display='block';
+    showToast('통계 자료 생성 완료 ✓');
+  }catch(e){
+    showToast('오류: '+e.message);
+  }finally{
+    setLoading(false);
+  }
+}
+
+// 특정 부서 URL에서 월 출석 집계 가져오기 → { 'YYYY-MM-DD': 출석인원 }
+async function fetchMonthForDept(url, year, month){
+  const u = new URL(url);
+  u.searchParams.set('action','recordsByMonth');
+  u.searchParams.set('year', year);
+  u.searchParams.set('month', month);
+  u.searchParams.set('_t', Date.now());
+  const res = await fetch(u.toString(), {redirect:'follow', cache:'no-cache'});
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const data = JSON.parse(await res.text());
+  const out = {};
+  if(data.byDate){
+    Object.keys(data.byDate).forEach(d=>{ out[d] = data.byDate[d].total || 0; });
+  }
+  return out;
+}
+
+function renderStatTable(){
+  const wrap = document.getElementById('stat-table-wrap');
+  if(!wrap || !statResultData) return;
+  const { dates, deptData } = statResultData;
+
+  // 헤더
+  let html = '<table class="stat-table"><thead><tr>';
+  html += '<th class="stat-corner">날짜</th>';
+  STAT_DEPT_ORDER.forEach(dn=>{ html += `<th>${STAT_DEPT_SHORT[dn]}</th>`; });
+  html += '<th class="stat-sum-col">합계</th></tr></thead><tbody>';
+
+  // 부서별 합계/카운트 (평균 계산용)
+  const deptTotals = {}; const deptCounts = {};
+  STAT_DEPT_ORDER.forEach(dn=>{ deptTotals[dn]=0; deptCounts[dn]=0; });
+
+  // 날짜별 행
+  dates.forEach(d=>{
+    const parts = d.split('-');
+    const label = `${+parts[1]}/${+parts[2]}`;  // M/D
+    html += `<tr><th>${label}</th>`;
+    let rowSum = 0;
+    STAT_DEPT_ORDER.forEach(dn=>{
+      const v = (deptData[dn] && deptData[dn][d] != null) ? deptData[dn][d] : null;
+      if(v != null){ rowSum += v; deptTotals[dn]+=v; deptCounts[dn]++; html += `<td>${v}</td>`; }
+      else { html += `<td style="color:#ccc;">-</td>`; }
+    });
+    html += `<td class="stat-sum-col">${rowSum}</td></tr>`;
+  });
+
+  // 평균 행
+  html += '<tr class="stat-avg-row"><th>평균</th>';
+  let avgRowSum = 0; let avgRowCnt = 0;
+  STAT_DEPT_ORDER.forEach(dn=>{
+    if(deptCounts[dn]>0){
+      const avg = deptTotals[dn]/deptCounts[dn];
+      avgRowSum += avg; avgRowCnt++;
+      html += `<td>${avg.toFixed(1)}</td>`;
+    } else {
+      html += `<td style="color:#ccc;">-</td>`;
+    }
+  });
+  html += `<td class="stat-sum-col">${avgRowCnt>0?avgRowSum.toFixed(1):'-'}</td></tr>`;
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+// 엑셀 다운로드
+function downloadStatsExcel(){
+  if(!statResultData){ showToast('먼저 통계를 생성해주세요'); return; }
+  const { year, months, dates, deptData } = statResultData;
+  const aoa = [];
+  // 헤더
+  const header = ['날짜', ...STAT_DEPT_ORDER.map(dn=>STAT_DEPT_SHORT[dn]), '합계'];
+  aoa.push(header);
+
+  const deptTotals = {}; const deptCounts = {};
+  STAT_DEPT_ORDER.forEach(dn=>{ deptTotals[dn]=0; deptCounts[dn]=0; });
+
+  dates.forEach(d=>{
+    const parts = d.split('-');
+    const row = [`${+parts[1]}/${+parts[2]}`];
+    let rowSum = 0;
+    STAT_DEPT_ORDER.forEach(dn=>{
+      const v = (deptData[dn] && deptData[dn][d] != null) ? deptData[dn][d] : null;
+      if(v != null){ rowSum += v; deptTotals[dn]+=v; deptCounts[dn]++; row.push(v); }
+      else row.push('');
+    });
+    row.push(rowSum);
+    aoa.push(row);
+  });
+
+  // 평균 행
+  const avgRow = ['평균'];
+  let avgRowSum = 0;
+  STAT_DEPT_ORDER.forEach(dn=>{
+    if(deptCounts[dn]>0){ const a=deptTotals[dn]/deptCounts[dn]; avgRowSum+=a; avgRow.push(Number(a.toFixed(1))); }
+    else avgRow.push('');
+  });
+  avgRow.push(Number(avgRowSum.toFixed(1)));
+  aoa.push(avgRow);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:8}, ...STAT_DEPT_ORDER.map(()=>({wch:7})), {wch:8}];
+  const wb = XLSX.utils.book_new();
+  const monthLabel = months.join('_');
+  XLSX.utils.book_append_sheet(wb, ws, '출석통계');
+  XLSX.writeFile(wb, `교육부_출석통계_${year}년_${monthLabel}월.xlsx`);
+}
 </script>
 </body>
 </html>
