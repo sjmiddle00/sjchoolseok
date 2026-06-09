@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>서부제일 교육부 출석체크</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
@@ -32,7 +32,7 @@ const DEPARTMENTS = [
 
 // 부서 선택 화면 관리자 비밀번호 (부서 활성화/비활성화 용)
 // ★ 배포 전 원하는 비밀번호로 변경하세요
-const DEPT_ADMIN_PW = '1234';
+const DEPT_ADMIN_PW = '0691';
 
 // ★ 옵저버 스프레드시트 GAS URL (보고자료 통합 전송용)
 // 옵저버 스프레드시트를 만들고 observer.gs를 배포한 후 URL을 입력하세요
@@ -265,13 +265,15 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .stat-month-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
 .stat-month-btn{padding:12px 4px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#fafafa;font-size:14px;font-weight:600;color:var(--txt);cursor:pointer;text-align:center;transition:.12s;}
 .stat-month-btn.on{background:var(--pr);color:#fff;border-color:var(--pr);}
-.stat-table{border-collapse:collapse;width:100%;font-size:13px;background:#fff;}
-.stat-table th,.stat-table td{border:1px solid #d5dae0;padding:7px 9px;text-align:center;white-space:nowrap;}
+.stat-table{border-collapse:collapse;width:100%;font-size:13px;background:#fff;table-layout:fixed;}
+.stat-table th,.stat-table td{border:1px solid #d5dae0;padding:7px 4px;text-align:center;white-space:nowrap;width:48px;}
+.stat-table th:first-child,.stat-table td:first-child{width:56px;}
 .stat-table thead th{background:#1a5276;color:#fff;font-weight:700;position:sticky;top:0;}
 .stat-table tbody th{background:#eaf2f8;color:#1a5276;font-weight:700;}
 .stat-table .stat-sum-col{background:#fdf2e9;color:#b7770d;font-weight:700;}
 .stat-table .stat-avg-row td,.stat-table .stat-avg-row th{background:#eafaf1;color:#1a7a41;font-weight:700;}
 .stat-table .stat-corner{background:#154360;}
+.stat-table .stat-month-sep td,.stat-table .stat-month-sep th{border-top:3px solid #1a5276;}
 .wt-clear-btn{width:100%;margin-top:8px;padding:8px;background:#fdedec;color:var(--rd-fg);border:1.5px solid #f5c6c2;border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;}
 .wt-clear-btn:active{opacity:.75;}
 .dp-group-disabled{opacity:.3;pointer-events:none;}
@@ -3399,10 +3401,15 @@ function renderStatTable(){
   STAT_DEPT_ORDER.forEach(dn=>{ deptTotals[dn]=0; deptCounts[dn]=0; });
 
   // 날짜별 행
+  let prevMonth = null;
   dates.forEach(d=>{
     const parts = d.split('-');
+    const curMonth = +parts[1];
     const label = `${+parts[1]}/${+parts[2]}`;  // M/D
-    html += `<tr><th>${label}</th>`;
+    // 월이 바뀌는 첫 행에 구분선 (첫 행 제외)
+    const sepCls = (prevMonth !== null && curMonth !== prevMonth) ? ' class="stat-month-sep"' : '';
+    prevMonth = curMonth;
+    html += `<tr${sepCls}><th>${label}</th>`;
     let rowSum = 0;
     STAT_DEPT_ORDER.forEach(dn=>{
       const v = (deptData[dn] && deptData[dn][d] != null) ? deptData[dn][d] : null;
@@ -3429,43 +3436,106 @@ function renderStatTable(){
   wrap.innerHTML = html;
 }
 
-// 엑셀 다운로드
+// 엑셀 다운로드 (화면 표와 동일한 색상·구조)
 function downloadStatsExcel(){
   if(!statResultData){ showToast('먼저 통계를 생성해주세요'); return; }
+  if(typeof XLSX==='undefined'){ showToast('엑셀 라이브러리 로드 실패 — 새로고침 후 다시 시도해주세요'); return; }
   const { year, months, dates, deptData } = statResultData;
-  const aoa = [];
-  // 헤더
-  const header = ['날짜', ...STAT_DEPT_ORDER.map(dn=>STAT_DEPT_SHORT[dn]), '합계'];
-  aoa.push(header);
 
+  // 스타일 정의 (화면 색상과 매칭, 업로드 양식 형식 반영)
+  const bThin  = { style:'thin',   color:{rgb:'D5DAE0'} };
+  const bMed   = { style:'medium', color:{rgb:'1A5276'} };
+  const C = { corner:'154360', head:'1A5276', headTxt:'FFFFFF',
+              sumBg:'FDF2E9', sumTxt:'B7770D', rowBg:'EAF2F8', rowTxt:'1A5276',
+              avgBg:'EAFAF1', avgTxt:'1A7A41' };
+
+  // 셀 위치별 테두리 계산: 표 외곽은 medium, 내부는 thin, 월경계 top은 medium
+  function mkBorder(ri, ci, isSep, totalRows, totalCols){
+    return {
+      top:    (ri===0 || isSep) ? bMed : bThin,
+      bottom: (ri===totalRows-1) ? bMed : bThin,
+      left:   (ci===0) ? bMed : bThin,
+      right:  (ci===totalCols-1) ? bMed : bThin
+    };
+  }
+  const baseAlign = { horizontal:'center', vertical:'center' };
+  function fillFont(bg, txt){ return { fill:{fgColor:{rgb:bg}}, font:{color:{rgb:txt},bold:true} }; }
+
+  const totalCols = STAT_DEPT_ORDER.length + 2; // 날짜 + 부서 + 합계
   const deptTotals = {}; const deptCounts = {};
   STAT_DEPT_ORDER.forEach(dn=>{ deptTotals[dn]=0; deptCounts[dn]=0; });
 
+  // 행 데이터 구성 (값 + 셀 종류) — 테두리는 나중에 위치로 계산
+  const rowsMeta = [];  // [{ cells:[{v,t,kind}], isSep }]
+  // 헤더
+  const headCells = [{ v:'날짜', kind:'corner' }];
+  STAT_DEPT_ORDER.forEach(dn=>headCells.push({ v:STAT_DEPT_SHORT[dn], kind:'head' }));
+  headCells.push({ v:'합계', kind:'sumHead' });
+  rowsMeta.push({ cells:headCells, isSep:false });
+
+  // 날짜 행
+  let prevMonth = null;
   dates.forEach(d=>{
     const parts = d.split('-');
-    const row = [`${+parts[1]}/${+parts[2]}`];
+    const curMonth = +parts[1];
+    const isSep = (prevMonth !== null && curMonth !== prevMonth);
+    prevMonth = curMonth;
+    const cells = [{ v:`${+parts[1]}/${+parts[2]}`, kind:'rowHead' }];
     let rowSum = 0;
     STAT_DEPT_ORDER.forEach(dn=>{
-      const v = (deptData[dn] && deptData[dn][d] != null) ? deptData[dn][d] : null;
-      if(v != null){ rowSum += v; deptTotals[dn]+=v; deptCounts[dn]++; row.push(v); }
-      else row.push('');
+      const val = (deptData[dn] && deptData[dn][d] != null) ? deptData[dn][d] : null;
+      if(val != null){ rowSum += val; deptTotals[dn]+=val; deptCounts[dn]++; cells.push({ v:val, t:'n', kind:'cell' }); }
+      else cells.push({ v:'', kind:'cell' });
     });
-    row.push(rowSum);
-    aoa.push(row);
+    cells.push({ v:rowSum, t:'n', kind:'sumCell' });
+    rowsMeta.push({ cells, isSep });
   });
 
   // 평균 행
-  const avgRow = ['평균'];
+  const avgCells = [{ v:'평균', kind:'avg' }];
   let avgRowSum = 0;
   STAT_DEPT_ORDER.forEach(dn=>{
-    if(deptCounts[dn]>0){ const a=deptTotals[dn]/deptCounts[dn]; avgRowSum+=a; avgRow.push(Number(a.toFixed(1))); }
-    else avgRow.push('');
+    if(deptCounts[dn]>0){ const a=deptTotals[dn]/deptCounts[dn]; avgRowSum+=a; avgCells.push({ v:Number(a.toFixed(1)), t:'n', kind:'avg' }); }
+    else avgCells.push({ v:'', kind:'avg' });
   });
-  avgRow.push(Number(avgRowSum.toFixed(1)));
-  aoa.push(avgRow);
+  avgCells.push({ v:Number(avgRowSum.toFixed(1)), t:'n', kind:'avg' });
+  rowsMeta.push({ cells:avgCells, isSep:true });  // 평균 행 위에도 굵은 선
 
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:8}, ...STAT_DEPT_ORDER.map(()=>({wch:7})), {wch:8}];
+  const totalRows = rowsMeta.length;
+
+  // kind별 채우기/폰트
+  function kindStyle(kind){
+    switch(kind){
+      case 'corner':  return fillFont(C.corner, C.headTxt);
+      case 'head':    return fillFont(C.head,   C.headTxt);
+      case 'sumHead': return fillFont(C.sumBg,  C.sumTxt);
+      case 'rowHead': return fillFont(C.rowBg,  C.rowTxt);
+      case 'sumCell': return fillFont(C.sumBg,  C.sumTxt);
+      case 'avg':     return fillFont(C.avgBg,  C.avgTxt);
+      default:        return { font:{ color:{rgb:'333333'} } }; // 일반 셀
+    }
+  }
+
+  // 시트 생성
+  const ws = XLSX.utils.aoa_to_sheet(rowsMeta.map(r=>r.cells.map(c=>c.v)));
+  rowsMeta.forEach((r,ri)=>{
+    r.cells.forEach((c,ci)=>{
+      const addr = XLSX.utils.encode_cell({r:ri, c:ci});
+      if(!ws[addr]) ws[addr] = { v:c.v };
+      const ks = kindStyle(c.kind);
+      ws[addr].s = Object.assign({}, ks, {
+        alignment: baseAlign,
+        border: mkBorder(ri, ci, r.isSep, totalRows, totalCols)
+      });
+      if(c.t) ws[addr].t = c.t;
+    });
+  });
+
+  // 열 너비: 날짜·합계는 넉넉히, 부서 열은 모두 동일하게
+  ws['!cols'] = [{wch:8}, ...STAT_DEPT_ORDER.map(()=>({wch:8})), {wch:8}];
+  // 행 높이 균일
+  ws['!rows'] = rowsMeta.map(()=>({hpt:20}));
+
   const wb = XLSX.utils.book_new();
   const monthLabel = months.join('_');
   XLSX.utils.book_append_sheet(wb, ws, '출석통계');
