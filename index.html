@@ -20,13 +20,13 @@
 -->
 <script>
 const DEPARTMENTS = [
+  { name: '영어예배부', emoji: '🌍', url: 'https://script.google.com/macros/s/AKfycbxaDXp0ylXb27yv7waPrMOINIvuLTUxp5kNJ7Nve_lbwjSAmdg-0wRQrP1HGgwaRSvrnw/exec', type: 'year' },
   { name: '영유아부', emoji: '🍼', url: 'https://script.google.com/macros/s/AKfycbzo9rqI6oTzc5uD14farTkALhXMTUhO_YZOBwyq8-ujAs-4RqLRjj7hgJOgII6vPWF3/exec', type: 'year' },
   { name: '유치부',  emoji: '🌱', url: 'https://script.google.com/macros/s/AKfycbwFYpoX1UpAvdL_3ioC-ufIf-y3wsLoXCv0E8OTY7xGvngE_PZeSKa46rVzMc2LKASLAg/exec',  type: 'year' },
   { name: '유년부',  emoji: '🎨', url: 'https://script.google.com/macros/s/AKfycbwZ91gomOxygMzIE3_n5CDTUuwQ9OUY-zkz4KAxxprqxjeASHFm7n3eY3k5JsQo7qrfOg/exec' },
   { name: '소년부',  emoji: '⚽', url: 'https://script.google.com/macros/s/AKfycbyplIR2TyvEeaj9K40poXij-Hiyz6YymAJx7ywwFAq-jJBghZLouz3bB6eNI912EKI17A/exec' },
   { name: '중등부',  emoji: '✏️', url: 'https://script.google.com/macros/s/AKfycbzoM5nnStnaeL5zuQljj6dURnE3z3j_R_MywXGAqwBNKz-8AQrUxRy3oZxbTTbjgPxr/exec' },
   { name: '고등부',  emoji: '🎒', url: 'https://script.google.com/macros/s/AKfycbzUnxJqAstX3Ilow3Rs16DL1dw_WnrIESeOMtWdfn6FHCdPyDMqDYCVA9foL0QeLtwV/exec' },
-  { name: '영어예배부', emoji: '🌍', url: 'https://script.google.com/macros/s/AKfycbxaDXp0ylXb27yv7waPrMOINIvuLTUxp5kNJ7Nve_lbwjSAmdg-0wRQrP1HGgwaRSvrnw/exec', type: 'year' },
   { name: '청년부',  emoji: '🌟', url: 'https://script.google.com/macros/s/AKfycbxjv0eEj81GFz1kYpOdPI0oMLBnEShR2shTN1I8OrpkpEd6c5JEz277JzyDh0FRHdF5/exec',  type: 'year' },
 ];
 
@@ -265,10 +265,10 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .stat-month-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
 .stat-month-btn{padding:12px 4px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#fafafa;font-size:14px;font-weight:600;color:var(--txt);cursor:pointer;text-align:center;transition:.12s;}
 .stat-month-btn.on{background:var(--pr);color:#fff;border-color:var(--pr);}
-.stat-table{border-collapse:collapse;width:100%;font-size:13px;background:#fff;table-layout:fixed;}
-.stat-table th,.stat-table td{border:1px solid #d5dae0;padding:7px 4px;text-align:center;white-space:nowrap;width:48px;}
-.stat-table th:first-child,.stat-table td:first-child{width:56px;}
-.stat-table thead th{background:#1a5276;color:#fff;font-weight:700;position:sticky;top:0;}
+.stat-table{border-collapse:collapse;font-size:13px;background:#fff;table-layout:fixed;width:auto;min-width:100%;}
+.stat-table th,.stat-table td{border:1px solid #d5dae0;padding:8px 4px;text-align:center;white-space:nowrap;width:46px;min-width:46px;max-width:46px;box-sizing:border-box;}
+.stat-table th:first-child,.stat-table td:first-child{width:52px;min-width:52px;max-width:52px;}
+.stat-table thead th{background:#1a5276;color:#fff;font-weight:700;position:sticky;top:0;font-size:12px;line-height:1.25;white-space:normal;}
 .stat-table tbody th{background:#eaf2f8;color:#1a5276;font-weight:700;}
 .stat-table .stat-sum-col{background:#fdf2e9;color:#b7770d;font-weight:700;}
 .stat-table .stat-avg-row td,.stat-table .stat-avg-row th{background:#eafaf1;color:#1a7a41;font-weight:700;}
@@ -678,7 +678,8 @@ select, input, button { min-width: 0; box-sizing: border-box; }
         <div class="lbl" style="margin:0;">통계 결과</div>
         <button class="rpt-save-btn" onclick="downloadStatsExcel()">📥 엑셀 다운로드</button>
       </div>
-      <div id="stat-table-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;"></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">← 좌우로 스크롤하면 전체 부서를 볼 수 있어요</div>
+      <div id="stat-table-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--bdr);border-radius:8px;"></div>
     </div>
   </div>
 </div>
@@ -776,7 +777,7 @@ select, input, button { min-width: 0; box-sizing: border-box; }
         <button class="stat-edit-btn" onclick="editStat('roster')" title="수정">✏️</button>
       </div>
       <div class="rpt-stat-row">
-        <span class="rpt-stat-lbl">출석</span>
+        <span class="rpt-stat-lbl">출석<span class="rpt-sub">(방문포함)</span></span>
         <span class="rpt-stat-val" id="rpt-attend">-</span>
         <span class="rpt-stat-unit">명</span>
       </div>
@@ -2596,8 +2597,11 @@ function scheduleFetchRptStats(){
 function recalcAttend(){
   const m = parseInt(document.getElementById('rpt-m-attend')?.textContent) || 0;
   const f = parseInt(document.getElementById('rpt-f-attend')?.textContent) || 0;
+  // 방문 인원 (남/여 방문자 행 개수)
+  const vm = document.getElementById('rpt-visitors-m')?.querySelectorAll('.rpt-visitor-row').length || 0;
+  const vf = document.getElementById('rpt-visitors-f')?.querySelectorAll('.rpt-visitor-row').length || 0;
   const elA = document.getElementById('rpt-attend');
-  if(elA) elA.textContent = m + f;
+  if(elA) elA.textContent = m + f + vm + vf;  // 재적 출석 + 방문 인원
 }
 
 async function fetchRptStats(){
@@ -2702,11 +2706,13 @@ function addVisitor(gender, data={}){
     <button class="rpt-vdel" onclick="removeVisitor(${id})">✕</button>`;
   container.appendChild(row);
   if(!data.name) row.querySelector('input').focus();
+  recalcAttend();  // 방문 인원 포함하여 출석 재계산
 }
 
 function removeVisitor(id){
   const el = document.getElementById(`vrow-${id}`);
   if(el) el.remove();
+  recalcAttend();  // 방문 인원 변동 반영
 }
 
 let absTeacherCnt = 0;
@@ -2930,6 +2936,7 @@ function applyReportData(draft){
   (draft.absTeachers||[]).forEach(t=>addAbsTeacher(t));
   (draft.events||[]).forEach(e=>addEvent(e));
   (draft.suggestions||[]).forEach(s=>addSuggestion(s));
+  recalcAttend();  // 방문 인원 포함 출석 총합 갱신
 }
 
 async function saveReportDraft(){
@@ -3162,7 +3169,7 @@ function buildReportHTML(data){
   h += `<div style="${secTtl}">출석 현황</div>
   <table style="width:100%;border-collapse:collapse;text-align:center;margin-bottom:4px;">
     <tr>
-      <th style="${thBase}">재적</th><th style="${thBase}">출석</th>
+      <th style="${thBase}">재적</th><th style="${thBase}">출석<br><span style="font-size:10px;font-weight:400;">(방문포함)</span></th>
       <th style="${thBase}">남(재적)</th><th style="${thBase}">여(재적)</th>
       <th style="${thBase}">남(방문)</th><th style="${thBase}">여(방문)</th>
     </tr>
@@ -3254,7 +3261,7 @@ document.getElementById('dept-admin-overlay').addEventListener('click',function(
 // ★ 교육부 출석 통계
 // ══════════════════════════════════════════════════════════════
 // 표 컬럼 순서 (요청 순서: 영유아·유치·유년·소년·중등·고등·영어·청년)
-const STAT_DEPT_ORDER = ['영유아부','유치부','유년부','소년부','중등부','고등부','영어예배부','청년부'];
+const STAT_DEPT_ORDER = ['영어예배부','영유아부','유치부','유년부','소년부','중등부','고등부','청년부'];
 const STAT_DEPT_SHORT = {'영유아부':'영유아','유치부':'유치','유년부':'유년','소년부':'소년','중등부':'중등','고등부':'고등','영어예배부':'영어','청년부':'청년'};
 let statYear = new Date().getFullYear();
 let statMonths = new Set();   // 선택된 월 (1~12)
