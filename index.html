@@ -288,6 +288,12 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .stat-edit-btn:active{opacity:1;}
 .rpt-stat-unit{font-size:14px;color:var(--muted);margin-left:4px;}
 .rpt-stat-note{font-size:11px;color:var(--muted);text-align:center;padding:8px 0 4px;}
+.grade-stat-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
+.grade-stat-table th,.grade-stat-table td{border:1px solid #e0e0e0;padding:7px 6px;text-align:center;}
+.grade-stat-table thead th{background:var(--pr-pl);color:var(--pr-dk);font-weight:700;font-size:12px;}
+.grade-stat-table tbody th{background:#f7f4fa;color:var(--pr-dk);font-weight:600;}
+.grade-stat-table .gs-total-row td,.grade-stat-table .gs-total-row th{background:#eef2f7;color:#1a5276;font-weight:700;}
+.grade-stat-title{font-size:13px;font-weight:700;color:var(--pr-dk);margin:4px 0 2px;}
 .rpt-visitor-sec{padding:12px 16px;border-top:1px solid var(--bdr);}
 .rpt-visitor-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
 .rpt-add-btn{padding:5px 14px;background:var(--pr-pl);color:var(--pr-dk);border:1.5px solid var(--pr);border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;}
@@ -794,6 +800,8 @@ select, input, button { min-width: 0; box-sizing: border-box; }
         <button class="stat-edit-btn" onclick="editStat('f')" title="수정">✏️</button>
       </div>
       <div class="rpt-stat-note" id="rpt-stat-note">오늘 출석체크 데이터 기준</div>
+      <!-- 학년별 재적·출석 표 -->
+      <div id="rpt-grade-stat-wrap" style="padding:0 14px 14px;"></div>
       <!-- 남(방문) -->
       <div class="rpt-visitor-sec">
         <div class="rpt-visitor-hdr">
@@ -2604,6 +2612,49 @@ function recalcAttend(){
   if(elA) elA.textContent = m + f + vm + vf;  // 재적 출석 + 방문 인원
 }
 
+// 학년별 재적·출석 집계 표 렌더 (앱 UI)
+let _lastGradeStats = null;  // 보고서 이미지용 보관
+function renderGradeStats(records){
+  const wrap = document.getElementById('rpt-grade-stat-wrap');
+  const data = computeGradeStats(records);
+  _lastGradeStats = data;
+  if(!wrap) return;
+  if(!data.rows.length){ wrap.innerHTML=''; return; }
+  const isYear = isDeptYearType();
+  const gradeLabel = isYear ? '출생연도' : '학년';
+  let html = `<div class="grade-stat-title">📋 ${gradeLabel}별 재적·출석</div>`;
+  html += `<table class="grade-stat-table"><thead><tr>
+    <th>${gradeLabel}</th><th>재적</th><th>출석</th><th>출석률</th></tr></thead><tbody>`;
+  data.rows.forEach(r=>{
+    const rate = r.roster>0 ? Math.round(r.attend/r.roster*100) : 0;
+    html += `<tr><th>${esc(r.grade)}</th><td>${r.roster}</td><td>${r.attend}</td><td>${rate}%</td></tr>`;
+  });
+  const totalRate = data.totalRoster>0 ? Math.round(data.totalAttend/data.totalRoster*100) : 0;
+  html += `<tr class="gs-total-row"><th>합계</th><td>${data.totalRoster}</td><td>${data.totalAttend}</td><td>${totalRate}%</td></tr>`;
+  html += `</tbody></table>`;
+  wrap.innerHTML = html;
+}
+
+// 학년별 재적·출석 계산 (재적=등록 학생, 출석=해당 날짜 출석 기록)
+function computeGradeStats(records){
+  const rosterByGrade = {};
+  students.forEach(s=>{
+    const g = s.grade || '미지정';
+    rosterByGrade[g] = (rosterByGrade[g]||0) + 1;
+  });
+  const attendByGrade = {};
+  (records||[]).forEach(r=>{
+    const g = r.grade || '미지정';
+    attendByGrade[g] = (attendByGrade[g]||0) + 1;
+  });
+  const grades = [...new Set([...Object.keys(rosterByGrade), ...Object.keys(attendByGrade)])];
+  grades.sort((a,b)=>String(a).localeCompare(String(b),'ko',{numeric:true}));
+  const rows = grades.map(g=>({ grade:g, roster:rosterByGrade[g]||0, attend:attendByGrade[g]||0 }));
+  const totalRoster = rows.reduce((s,r)=>s+r.roster,0);
+  const totalAttend = rows.reduce((s,r)=>s+r.attend,0);
+  return { rows, totalRoster, totalAttend };
+}
+
 async function fetchRptStats(){
   const ids = ['rpt-attend','rpt-m-attend','rpt-f-attend'];
   ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='…'; });
@@ -2622,6 +2673,7 @@ async function fetchRptStats(){
     if(elM && !statEdited.m){ elM.textContent = rec.filter(r=>r.gender==='남').length; elM.classList.remove('edited'); }
     if(elF && !statEdited.f){ elF.textContent = rec.filter(r=>r.gender==='여').length; elF.classList.remove('edited'); }
     recalcAttend();  // 출석 = 남 + 여 자동 계산
+    renderGradeStats(rec);  // 학년별 재적·출석 표
     if(note) note.textContent = `${rptY}년 ${rptM}월 ${rptD}일 출석 기준`;
   }catch(e){
     ['rpt-m-attend','rpt-f-attend'].forEach(id=>{ const el=document.getElementById(id); if(el && el.textContent==='…') el.textContent='-'; });
@@ -2851,7 +2903,9 @@ function collectReportData(){
     visitorsM:   getVisitors('m'),
     visitorsF:   getVisitors('f'),
     events:      getEvents(),
-    suggestions: getSuggestions()
+    suggestions: getSuggestions(),
+    gradeStats:  _lastGradeStats,
+    isYearDept:  isDeptYearType()
   };
 }
 
@@ -3182,6 +3236,33 @@ function buildReportHTML(data){
       <td style="${tdBase}font-size:18px;font-weight:700;text-align:center;">${visitF}</td>
     </tr>
   </table>`;
+
+  // 학년별 재적·출석
+  if(data.gradeStats && data.gradeStats.rows && data.gradeStats.rows.length){
+    const gs = data.gradeStats;
+    const glabel = data.isYearDept ? '출생연도' : '학년';
+    h += `<div style="${secTtl}">${glabel}별 재적·출석</div>
+    <table style="width:100%;border-collapse:collapse;text-align:center;margin-bottom:4px;">
+      <tr>
+        <th style="${thBase}">${glabel}</th><th style="${thBase}">재적</th><th style="${thBase}">출석</th><th style="${thBase}">출석률</th>
+      </tr>`;
+    gs.rows.forEach(r=>{
+      const rate = r.roster>0 ? Math.round(r.attend/r.roster*100) : 0;
+      h += `<tr>
+        <td style="${tdBase}text-align:center;font-weight:600;">${r.grade}</td>
+        <td style="${tdBase}text-align:center;">${r.roster}</td>
+        <td style="${tdBase}text-align:center;">${r.attend}</td>
+        <td style="${tdBase}text-align:center;">${rate}%</td>
+      </tr>`;
+    });
+    const totalRate = gs.totalRoster>0 ? Math.round(gs.totalAttend/gs.totalRoster*100) : 0;
+    h += `<tr>
+      <td style="${tdBase}text-align:center;font-weight:700;background:#eef2f7;">합계</td>
+      <td style="${tdBase}text-align:center;font-weight:700;background:#eef2f7;">${gs.totalRoster}</td>
+      <td style="${tdBase}text-align:center;font-weight:700;background:#eef2f7;">${gs.totalAttend}</td>
+      <td style="${tdBase}text-align:center;font-weight:700;background:#eef2f7;">${totalRate}%</td>
+    </tr></table>`;
+  }
 
   // 방문자
   if(visitM||visitF){
