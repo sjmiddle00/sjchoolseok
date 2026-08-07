@@ -297,6 +297,20 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .rpt-visitor-sec{padding:12px 16px;border-top:1px solid var(--bdr);}
 .rpt-visitor-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
 .rpt-add-btn{padding:5px 14px;background:var(--pr-pl);color:var(--pr-dk);border:1.5px solid var(--pr);border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;}
+.bible-pick-btn{height:48px;display:flex;align-items:center;justify-content:center;padding:0 10px;background:#fafafa;border:1.5px solid var(--bdr);border-radius:11px;font-size:15px;font-weight:600;color:var(--txt);cursor:pointer;transition:.12s;text-align:center;box-sizing:border-box;}
+.bible-pick-btn:active{background:var(--pr-pl);border-color:var(--pr);}
+.bible-pick-btn.filled{background:var(--pr-pl);border-color:var(--pr);color:var(--pr-dk);font-weight:700;}
+.bible-grid{display:grid;gap:8px;}
+.bible-grid.g-book{grid-template-columns:repeat(3,1fr);}
+.bible-grid.g-num{grid-template-columns:repeat(5,1fr);}
+.bible-grid-cell{height:48px;display:flex;align-items:center;justify-content:center;padding:2px 3px;background:#f7f7f9;border:1.5px solid #e4e4e8;border-radius:10px;font-size:13.5px;font-weight:600;color:var(--txt);cursor:pointer;transition:.1s;text-align:center;line-height:1.1;box-sizing:border-box;word-break:keep-all;overflow:hidden;}
+.bible-grid.g-num .bible-grid-cell{font-size:16px;}
+.bible-grid.g-book .bible-grid-cell{font-size:13px;}
+.bible-grid-cell:active{transform:scale(.94);background:var(--pr-pl);}
+.bible-grid-cell.sel{background:var(--pr);border-color:var(--pr);color:#fff;}
+.bible-grid-cell.testament-hdr{grid-column:1/-1;height:auto;justify-content:flex-start;background:none;border:none;font-size:13px;font-weight:700;color:var(--pr-dk);padding:6px 4px 4px;cursor:default;border-bottom:2px solid var(--pr-pl);margin-bottom:2px;border-radius:0;}
+.bible-grid-cell.testament-hdr:first-child{padding-top:0;}
+.bible-grid-cell.testament-hdr:active{transform:none;background:none;}
 .rpt-add-btn:active{opacity:.8;}
 .rpt-visitor-row{display:flex;gap:6px;align-items:center;margin-bottom:7px;}
 .rpt-vinp{flex:1;padding:10px 11px;font-size:14px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7;color:var(--txt);min-width:0;}
@@ -750,32 +764,31 @@ select, input, button { min-width: 0; box-sizing: border-box; }
   <div class="adm-sec">
     <div class="adm-sec-ttl">설교 본문</div>
     <div class="card" style="margin:0;padding:14px;">
-      <!-- 성경 책 드럼 -->
-      <div style="display:flex;justify-content:center;margin-bottom:10px;">
-        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
-          <div class="dp-col" id="dp-bk" style="width:118px;"></div>
-          <div class="dp-unit">성경</div>
-        </div>
+      <!-- 성경/장/절 선택 버튼 -->
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="bible-pick-btn" id="pick-book-btn" onclick="openBibleGrid('book')" style="flex:1;">성경 선택</button>
+        <span style="width:10px;flex-shrink:0;"></span>
+        <button class="bible-pick-btn" id="pick-chap-btn" onclick="openBibleGrid('chap')" style="flex:1;">장</button>
       </div>
-      <!-- 장 / 절 드럼 -->
-      <div style="display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;">
-        <div class="dp-group">
-          <div class="dp-col" id="dp-ch"></div>
-          <div class="dp-unit">장</div>
-        </div>
-        <div class="dp-group">
-          <div class="dp-col" id="dp-v1"></div>
-          <div class="dp-unit">절</div>
-        </div>
-        <div style="font-size:17px;font-weight:700;color:var(--muted);padding:0 2px;align-self:center;">~</div>
-        <div class="dp-group">
-          <div class="dp-col" id="dp-v2"></div>
-          <div class="dp-unit">절</div>
-        </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+        <button class="bible-pick-btn" id="pick-vs1-btn" onclick="openBibleGrid('vs1')" style="flex:1;">시작절</button>
+        <span style="width:10px;flex-shrink:0;text-align:center;font-size:16px;font-weight:700;color:var(--muted);">~</span>
+        <button class="bible-pick-btn" id="pick-vs2-btn" onclick="openBibleGrid('vs2')" style="flex:1;">끝절</button>
       </div>
-      <div style="text-align:center;font-size:14px;font-weight:600;color:var(--pr-dk);margin-top:10px;min-height:20px;" id="bible-caption"></div>
+      <div style="text-align:center;font-size:15px;font-weight:700;color:var(--pr-dk);margin-top:12px;min-height:22px;" id="bible-caption"></div>
       <button class="rpt-add-btn" style="width:100%;margin-top:10px;" onclick="addPassage()">＋ 본문 추가</button>
       <div id="passage-list" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- 성경 선택 그리드 모달 -->
+  <div class="overlay" id="bible-grid-modal">
+    <div class="modal" style="max-width:430px;width:92%;max-height:78vh;display:flex;flex-direction:column;padding:0;overflow:hidden;border-radius:18px;">
+      <div style="padding:16px 18px;background:var(--pr-pl);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <div style="font-size:16px;font-weight:700;color:var(--pr-dk);" id="bible-grid-title">성경 선택</div>
+        <button onclick="closeModal('bible-grid-modal')" style="background:none;border:none;font-size:24px;color:var(--pr-dk);cursor:pointer;line-height:1;padding:0 2px;">×</button>
+      </div>
+      <div id="bible-grid-body" style="padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
     </div>
   </div>
 
@@ -3108,16 +3121,8 @@ function applyReportData(draft){
   if(draft.bible){
     rptBook=draft.bible.book; rptChap=draft.bible.chap;
     rptVs1=draft.bible.vs1;   rptVs2=draft.bible.vs2;
-    if(drumBibleReady){
-      drumBk.setIdx(rptBook,false);
-      drumCh.reload(getChItems(rptBook),false);
-      drumCh.setIdx(rptChap,false);
-      drumV1.reload(getVsItems(rptBook,rptChap),false);
-      drumV1.setIdx(rptVs1,false);
-      drumV2.reload(getVsItems(rptBook,rptChap,true),false);
-      drumV2.setIdx(rptVs2===''?0:+rptVs2,false);
-      updateBibleCaption();
-    }
+    refreshBibleBtns();
+    updateBibleCaption();
   }
   // 추가된 본문 목록 복원
   passageList = (draft.passages||[]).map(text=>({ id:++passageCnt, text }));
@@ -3194,47 +3199,108 @@ async function loadReportDraft(){
   }catch(e){ showToast('불러오기 실패: '+e.message); }
   finally{ setLoading(false); }
 }
+// ── ★ 성경 본문 그리드 선택기 (드럼 대체) ──────────────────────
 function initBibleDrums(){
-  const bkItems=getBkItems();
-  const chItems=getChItems(0);
-  const vsItems=getVsItems(0,0);
-  const vs2Items=getVsItems(0,0,true);
-
-  if(!drumBibleReady){
-    drumBibleReady=true;
-    drumBk=createDrum('dp-bk',bkItems,bkItems[0],v=>{
-      rptBook=BIBLE.findIndex(b=>b.n===v);
-      rptChap=0; rptVs1=0; rptVs2='';
-      drumCh.reload(getChItems(rptBook),false);
-      drumV1.reload(getVsItems(rptBook,0),false);
-      drumV2.reload(getVsItems(rptBook,0,true),false);
-      updateBibleCaption();
-    },{selFs:'14px',regFs:'11px'});
-
-    drumCh=createDrum('dp-ch',chItems,'1',v=>{
-      rptChap=+v-1; rptVs1=0; rptVs2='';
-      drumV1.reload(getVsItems(rptBook,rptChap),false);
-      drumV2.reload(getVsItems(rptBook,rptChap,true),false);
-      updateBibleCaption();
-    });
-
-    drumV1=createDrum('dp-v1',vsItems,'1',v=>{
-      rptVs1=+v-1; updateBibleCaption();
-    });
-
-    drumV2=createDrum('dp-v2',vs2Items,'',v=>{
-      rptVs2=v; updateBibleCaption();
-    });
-  } else {
-    drumBk.setIdx(rptBook,false);
-    drumCh.reload(getChItems(rptBook),false);
-    drumCh.setIdx(rptChap,false);
-    drumV1.reload(getVsItems(rptBook,rptChap),false);
-    drumV1.setIdx(rptVs1,false);
-    drumV2.reload(getVsItems(rptBook,rptChap,true),false);
-    drumV2.setIdx(rptVs2===''?0:+rptVs2,false);
-  }
+  // 버튼 라벨을 현재 상태로 갱신
+  refreshBibleBtns();
   updateBibleCaption();
+}
+
+// 선택 버튼 라벨 갱신
+function refreshBibleBtns(){
+  const bkBtn = document.getElementById('pick-book-btn');
+  const chBtn = document.getElementById('pick-chap-btn');
+  const v1Btn = document.getElementById('pick-vs1-btn');
+  const v2Btn = document.getElementById('pick-vs2-btn');
+  if(bkBtn){ bkBtn.textContent = BIBLE[rptBook].n; bkBtn.classList.add('filled'); }
+  if(chBtn){ chBtn.textContent = (rptChap+1)+'장'; chBtn.classList.add('filled'); }
+  if(v1Btn){ v1Btn.textContent = (rptVs1+1)+'절'; v1Btn.classList.add('filled'); }
+  if(v2Btn){
+    if(rptVs2==='' || +rptVs2<=rptVs1+1){ v2Btn.textContent='끝절'; v2Btn.classList.remove('filled'); }
+    else { v2Btn.textContent = rptVs2+'절'; v2Btn.classList.add('filled'); }
+  }
+}
+
+// 그리드 모달 열기 (kind: book/chap/vs1/vs2)
+let _bibleGridKind = 'book';
+function openBibleGrid(kind){
+  _bibleGridKind = kind;
+  const title = document.getElementById('bible-grid-title');
+  const body = document.getElementById('bible-grid-body');
+  if(!body) return;
+
+  if(kind==='book'){
+    title.textContent = '성경 선택';
+    let html = '';
+    // 구약 (0~38), 신약 (39~65)
+    html += '<div class="bible-grid g-book">';
+    html += '<div class="bible-grid-cell testament-hdr">구약</div>';
+    BIBLE.forEach((b,i)=>{
+      if(i===39) html += '<div class="bible-grid-cell testament-hdr">신약</div>';
+      const sel = i===rptBook ? ' sel' : '';
+      html += `<div class="bible-grid-cell${sel}" onclick="pickBible('book',${i})">${esc(b.n)}</div>`;
+    });
+    html += '</div>';
+    body.innerHTML = html;
+  } else if(kind==='chap'){
+    title.textContent = `${BIBLE[rptBook].n} · 장 선택`;
+    const chCount = BIBLE[rptBook].v.length;
+    let html = '<div class="bible-grid g-num">';
+    for(let c=0;c<chCount;c++){
+      const sel = c===rptChap ? ' sel' : '';
+      html += `<div class="bible-grid-cell${sel}" onclick="pickBible('chap',${c})">${c+1}</div>`;
+    }
+    html += '</div>';
+    body.innerHTML = html;
+  } else if(kind==='vs1'){
+    title.textContent = `${BIBLE[rptBook].n} ${rptChap+1}장 · 시작절`;
+    const vCount = BIBLE[rptBook].v[rptChap];
+    let html = '<div class="bible-grid g-num">';
+    for(let v=0;v<vCount;v++){
+      const sel = v===rptVs1 ? ' sel' : '';
+      html += `<div class="bible-grid-cell${sel}" onclick="pickBible('vs1',${v})">${v+1}</div>`;
+    }
+    html += '</div>';
+    body.innerHTML = html;
+  } else if(kind==='vs2'){
+    title.textContent = `${BIBLE[rptBook].n} ${rptChap+1}장 · 끝절`;
+    const vCount = BIBLE[rptBook].v[rptChap];
+    let html = '<div class="bible-grid g-num">';
+    // 시작절과 같으면 단일 구절 (끝절 = 시작절)
+    html += `<div class="bible-grid-cell${rptVs2===''?' sel':''}" onclick="pickBible('vs2','')">단절</div>`;
+    for(let v=rptVs1+1;v<vCount;v++){  // 시작절 다음부터
+      const sel = (rptVs2!=='' && +rptVs2===v+1) ? ' sel' : '';
+      html += `<div class="bible-grid-cell${sel}" onclick="pickBible('vs2',${v+1})">${v+1}</div>`;
+    }
+    html += '</div>';
+    body.innerHTML = html;
+  }
+  openModal('bible-grid-modal');
+}
+
+// 그리드에서 선택
+function pickBible(kind, val){
+  if(kind==='book'){
+    rptBook = val; rptChap = 0; rptVs1 = 0; rptVs2 = '';
+    refreshBibleBtns(); updateBibleCaption();
+    closeModal('bible-grid-modal');
+    setTimeout(()=>openBibleGrid('chap'), 180);  // 자동으로 장 선택으로
+  } else if(kind==='chap'){
+    rptChap = val; rptVs1 = 0; rptVs2 = '';
+    refreshBibleBtns(); updateBibleCaption();
+    closeModal('bible-grid-modal');
+    setTimeout(()=>openBibleGrid('vs1'), 180);  // 자동으로 시작절로
+  } else if(kind==='vs1'){
+    rptVs1 = val;
+    if(rptVs2!=='' && +rptVs2<=rptVs1+1) rptVs2='';  // 끝절이 시작절보다 앞이면 초기화
+    refreshBibleBtns(); updateBibleCaption();
+    closeModal('bible-grid-modal');
+    setTimeout(()=>openBibleGrid('vs2'), 180);  // 자동으로 끝절로
+  } else if(kind==='vs2'){
+    rptVs2 = val;  // '' 또는 숫자
+    refreshBibleBtns(); updateBibleCaption();
+    closeModal('bible-grid-modal');
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
