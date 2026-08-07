@@ -538,19 +538,43 @@ select, input, button { min-width: 0; box-sizing: border-box; }
   </div>
 
   <div class="adm-sec">
-    <div class="adm-sec-ttl">엑셀 일괄 등록</div>
+    <div class="adm-sec-ttl">엑셀 학생 관리</div>
     <div class="card">
-      <p class="excel-desc" id="excel-desc"><b>A열: 이름 / B열: 학년 / C열: 성별 / D열: 반</b> 형식의 엑셀 파일을 업로드하세요.</p>
-      <div class="excel-btns">
-        <label class="excel-select-btn" for="excel-file">📂 엑셀 파일 선택</label>
-        <button class="excel-tpl-btn" onclick="downloadTemplate()">📋 샘플 양식</button>
+      <!-- 현재 명단 다운로드 -->
+      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--bdr);">
+        <div style="font-size:14px;font-weight:700;color:var(--pr-dk);margin-bottom:6px;">① 현재 명단 다운로드</div>
+        <p class="excel-desc" style="margin-bottom:8px;">등록된 학생 전체를 엑셀로 내려받아요. 반·학년을 시즌별로 수정할 때 사용하세요. (고유코드 포함)</p>
+        <button class="excel-tpl-btn" style="width:100%;" onclick="downloadStudentList()">📥 현재 학생 명단 다운로드</button>
       </div>
-      <input type="file" id="excel-file" accept=".xlsx,.xls" style="display:none" onchange="onExcelFile(event)"/>
-      <div class="excel-preview" id="excel-preview">
-        <div class="excel-preview-hdr"><span id="preview-count">미리보기</span><span style="font-weight:400">흐림=이미 등록됨</span></div>
-        <div class="excel-preview-list" id="preview-list"></div>
+
+      <!-- 신규 등록 -->
+      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--bdr);">
+        <div style="font-size:14px;font-weight:700;color:var(--pr-dk);margin-bottom:6px;">② 신규 학생 일괄 등록</div>
+        <p class="excel-desc" id="excel-desc" style="margin-bottom:8px;"><b>A열: 이름 / B열: 학년 / C열: 성별 / D열: 반</b> 형식으로 새 학생을 등록해요.</p>
+        <div class="excel-btns">
+          <label class="excel-select-btn" for="excel-file">📂 신규 등록 파일 선택</label>
+          <button class="excel-tpl-btn" onclick="downloadTemplate()">📋 샘플 양식</button>
+        </div>
+        <input type="file" id="excel-file" accept=".xlsx,.xls" style="display:none" onchange="onExcelFile(event)"/>
+        <div class="excel-preview" id="excel-preview">
+          <div class="excel-preview-hdr"><span id="preview-count">미리보기</span><span style="font-weight:400">흐림=이미 등록됨</span></div>
+          <div class="excel-preview-list" id="preview-list"></div>
+        </div>
+        <button class="excel-upload-btn" id="excel-upload-btn" onclick="uploadExcel()">일괄 등록하기</button>
       </div>
-      <button class="excel-upload-btn" id="excel-upload-btn" onclick="uploadExcel()">일괄 등록하기</button>
+
+      <!-- 정보 일괄 수정 -->
+      <div>
+        <div style="font-size:14px;font-weight:700;color:var(--pr-dk);margin-bottom:6px;">③ 학생 정보 일괄 수정</div>
+        <p class="excel-desc" style="margin-bottom:8px;">①에서 받은 명단을 고쳐서 올리면 <b>고유코드로 매칭해 수정만</b> 이루어져요. (새 학생은 추가되지 않아요)</p>
+        <label class="excel-select-btn" for="excel-edit-file" style="width:100%;box-sizing:border-box;">📝 수정 파일 선택</label>
+        <input type="file" id="excel-edit-file" accept=".xlsx,.xls" style="display:none" onchange="onExcelEditFile(event)"/>
+        <div class="excel-preview" id="excel-edit-preview">
+          <div class="excel-preview-hdr"><span id="edit-preview-count">미리보기</span><span style="font-weight:400">✎=수정 대상</span></div>
+          <div class="excel-preview-list" id="edit-preview-list"></div>
+        </div>
+        <button class="excel-upload-btn" id="excel-edit-btn" onclick="uploadExcelEdit()">일괄 수정하기</button>
+      </div>
     </div>
   </div>
 
@@ -2142,6 +2166,156 @@ function downloadTemplate(){
     XLSX.utils.book_append_sheet(wb, ws, '학생목록');
     XLSX.writeFile(wb, (currentDept?.name||'')+'_학생목록_양식.xlsx');
   }
+}
+
+// ── 현재 학생 명단 다운로드 (고유코드 포함, 수정용) ──────────────
+function downloadStudentList(){
+  if(typeof XLSX==='undefined'){ showToast('엑셀 라이브러리 로드 실패 — 새로고침 후 다시 시도해주세요'); return; }
+  if(!students.length){ showToast('등록된 학생이 없습니다'); return; }
+  const isYear = isDeptYearType();
+  const useCls = useClass();
+  const gradeLabel = isYear ? '출생연도' : '학년';
+
+  // 헤더: 이름/학년/성별/(반)/고유코드
+  const header = ['이름', gradeLabel, '성별'];
+  if(useCls) header.push('반');
+  header.push('고유코드');
+
+  // 정렬: 학년 → 반 → 이름
+  const sorted = students.slice().sort((a,b)=>{
+    const g = String(a.grade).localeCompare(String(b.grade),'ko',{numeric:true});
+    if(g!==0) return g;
+    const c = String(a.cls||'').localeCompare(String(b.cls||''),'ko',{numeric:true});
+    if(c!==0) return c;
+    return String(a.name).localeCompare(String(b.name),'ko');
+  });
+
+  const aoa = [header];
+  sorted.forEach(s=>{
+    const row = [s.name, s.grade, s.gender||''];
+    if(useCls) row.push(s.cls||'');
+    row.push(s.uid||'');
+    aoa.push(row);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = useCls
+    ? [{wch:14},{wch:12},{wch:8},{wch:8},{wch:20}]
+    : [{wch:14},{wch:12},{wch:8},{wch:20}];
+
+  // 고유코드 열은 회색 배경 + 안내 (수정 금지 표시)
+  const uidColIdx = header.length - 1;
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for(let r=0; r<=range.e.r; r++){
+    const addr = XLSX.utils.encode_cell({r, c:uidColIdx});
+    if(ws[addr]){
+      ws[addr].s = { fill:{fgColor:{rgb:r===0?'7D3C98':'F0F0F0'}}, font:{color:{rgb:r===0?'FFFFFF':'999999'}, bold:r===0}, alignment:{horizontal:'center'} };
+    }
+  }
+  // 헤더 스타일
+  for(let c=0; c<header.length-1; c++){
+    const addr = XLSX.utils.encode_cell({r:0, c});
+    if(ws[addr]) ws[addr].s = { fill:{fgColor:{rgb:'7D3C98'}}, font:{color:{rgb:'FFFFFF'},bold:true}, alignment:{horizontal:'center'} };
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '학생명단');
+  const today = new Date();
+  const dstr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  XLSX.writeFile(wb, `${currentDept?.name||''}_학생명단_${dstr}.xlsx`);
+  showToast(`${students.length}명 명단 다운로드 완료`);
+}
+
+// ── 수정용 엑셀 파싱 (고유코드 필수) ─────────────────────────────
+let parsedEditXlsx = [];
+function onExcelEditFile(event){
+  const file=event.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      if(!rows.length){ showToast('데이터가 없습니다'); return; }
+      // 헤더에서 각 열 위치 찾기 (고유코드 열 위치가 부서마다 다름)
+      const head = rows[0].map(c=>String(c).trim());
+      const idxName = 0, idxGrade = 1, idxGender = 2;
+      const useCls = useClass();
+      const idxCls = useCls ? 3 : -1;
+      // 고유코드 열: 헤더명으로 탐색
+      let idxUid = head.findIndex(h=>h==='고유코드');
+      if(idxUid < 0) idxUid = useCls ? 4 : 3;  // 못 찾으면 관례 위치
+
+      const uidSet = new Set(students.map(s=>s.uid));
+      parsedEditXlsx=[];
+      for(let i=1;i<rows.length;i++){
+        const name=String(rows[i][idxName]||'').trim();
+        const rawGrade=String(rows[i][idxGrade]||'').trim();
+        const grade = isDeptYearType() ? normalizeYear(rawGrade) : (rawGrade||'미지정');
+        const rawGender=String(rows[i][idxGender]||'').trim();
+        const gender = rawGender.startsWith('남') ? '남' : rawGender.startsWith('여') ? '여' : '';
+        const cls = (useCls && idxCls>=0) ? String(rows[i][idxCls]||'').trim() : '';
+        const uid = String(rows[i][idxUid]||'').trim();
+        if(!name) continue;
+        const matched = uid && uidSet.has(uid);
+        parsedEditXlsx.push({name, grade, gender, cls, uid, matched});
+      }
+      showEditPreview();
+    }catch(err){showToast('파일 읽기 오류: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showEditPreview(){
+  const preview=document.getElementById('excel-edit-preview');
+  const btn=document.getElementById('excel-edit-btn');
+  const plist=document.getElementById('edit-preview-list');
+  if(!parsedEditXlsx.length){
+    preview.style.display='block';
+    plist.innerHTML='<div style="padding:12px;font-size:13px;color:var(--rd-fg)">데이터를 찾을 수 없습니다.</div>';
+    btn.style.display='none'; return;
+  }
+  const editCount=parsedEditXlsx.filter(s=>s.matched).length;
+  const noMatch=parsedEditXlsx.filter(s=>!s.matched).length;
+  document.getElementById('edit-preview-count').textContent=`총 ${parsedEditXlsx.length}명 (수정 ${editCount}명${noMatch?`, 코드없음 ${noMatch}명 제외`:''})`;
+  plist.innerHTML=parsedEditXlsx.map(s=>`
+    <div class="excel-preview-row ${s.matched?'':'dup'}">
+      <span class="pr-name">${esc(s.name)}</span>
+      <span class="pr-grade">${esc(s.grade)}${(useClass()&&s.cls)?' · '+esc(s.cls)+'반':''}${s.gender?' · '+esc(s.gender):''}${s.matched?' ✎':' ⚠코드없음'}</span>
+    </div>`).join('');
+  preview.style.display='block';
+  if(editCount>0){ btn.style.display='block'; btn.textContent=`${editCount}명 정보 일괄 수정하기`; }
+  else{ btn.style.display='none'; showToast('수정할 수 있는 학생이 없습니다 (고유코드 확인)'); }
+}
+
+async function uploadExcelEdit(){
+  const toEdit=parsedEditXlsx.filter(s=>s.matched);
+  if(!toEdit.length) return;
+  const CHUNK=30;
+  const chunks=[];
+  for(let i=0;i<toEdit.length;i+=CHUNK) chunks.push(toEdit.slice(i,i+CHUNK));
+  let totalUpdated=0;
+  setLoading(true,`${toEdit.length}명 수정 준비 중...`);
+  try{
+    for(let i=0;i<chunks.length;i++){
+      const done=Math.min((i+1)*CHUNK, toEdit.length);
+      setLoading(true,`수정 중... (${done}/${toEdit.length}명)`);
+      const payload=chunks[i].map(s=>({uid:s.uid,name:s.name,grade:s.grade,gender:s.gender||'',cls:s.cls||''}));
+      const data=await api({action:'bulkEditStudents', students:JSON.stringify(payload)});
+      if(data.error){ showToast('오류: '+data.error); if(data.students){students=data.students;renderStudentList();buildGradeFilter();} return; }
+      totalUpdated += (data.updated||[]).length;
+      if(data.students) students=data.students;
+    }
+    renderStudentList(); buildGradeFilter();
+    showToast(`완료: ${totalUpdated}명 정보 수정됨`);
+    parsedEditXlsx=[];
+    document.getElementById('excel-edit-preview').style.display='none';
+    document.getElementById('excel-edit-btn').style.display='none';
+    document.getElementById('excel-edit-file').value='';
+  }catch(e){
+    showToast('연결 오류: '+e.message);
+    try{ const d=await api({action:'students'}); students=d.students||[]; renderStudentList(); buildGradeFilter(); }catch(_){}
+  }
+  finally{setLoading(false);}
 }
 
 // ── 관리자 ───────────────────────────────────────────────────
