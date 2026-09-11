@@ -183,6 +183,11 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .cnt-chip{background:var(--pr-pl);color:var(--pr-dk);font-size:12px;font-weight:700;padding:3px 12px;border-radius:20px;}
 .upd-time{font-size:11px;color:var(--muted);margin-top:4px;}
 .rec-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid #f2f2f2;}
+.rec-info{flex:1;min-width:0;}
+.rec-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.rec-editable{cursor:pointer;gap:10px;}
+.rec-editable.rec-checked{background:#fdf2f2;}
+.rec-check-wrap{display:flex;align-items:center;flex-shrink:0;}
 .rec-row:last-child{border-bottom:none;}
 .r-name{font-size:15px;font-weight:600;}.r-meta{font-size:11px;color:var(--muted);margin-top:2px;}
 .badge{font-size:12px;font-weight:700;padding:5px 13px;border-radius:20px;}
@@ -313,6 +318,7 @@ input:checked+.toggle-slider::before{transform:translateX(22px);}
 .bible-grid-cell.testament-hdr:active{transform:none;background:none;}
 .rpt-add-btn:active{opacity:.8;}
 .rpt-visitor-row{display:flex;gap:6px;align-items:center;margin-bottom:7px;}
+.abs-teacher-name{flex:0 0 40%;min-width:0;font-size:14px;font-weight:600;color:var(--pr-dk);background:var(--pr-pl);border-radius:8px;padding:9px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .rpt-vinp{flex:1;padding:10px 11px;font-size:14px;border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7;color:var(--txt);min-width:0;}
 .rpt-vinp:focus{outline:none;border-color:var(--pr);background:#fff;}
 .rpt-vinp.sm{flex:0 0 86px;}
@@ -493,10 +499,19 @@ select, input, button { min-width: 0; box-sizing: border-box; }
   <div class="card">
     <div class="rec-hdr">
       <div><div class="lbl" style="margin:0">오늘 출석 현황 <span class="pending-badge" id="pending-badge"></span></div><div class="upd-time" id="upd-time"></div></div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button onclick="refreshAll()" style="background:var(--pr-pl);color:var(--pr-dk);border:none;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;">↻ 새로고침</button>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button onclick="refreshAll()" style="background:var(--pr-pl);color:var(--pr-dk);border:none;border-radius:20px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;">↻ 새로고침</button>
         <div class="cnt-chip" id="cnt-chip">0명</div>
+        <button id="rec-edit-btn" onclick="toggleRecEdit()" style="background:#eef2f7;color:#1a5276;border:none;border-radius:20px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;">편집</button>
       </div>
+    </div>
+    <!-- 편집 모드 일괄 삭제 바 -->
+    <div id="rec-edit-bar" style="display:none;align-items:center;justify-content:space-between;background:#fdf2f2;border:1px solid #f5c6c6;border-radius:10px;padding:8px 12px;margin-bottom:10px;">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;">
+        <input type="checkbox" id="rec-select-all" onchange="toggleRecSelectAll(this)" style="width:18px;height:18px;accent-color:var(--rd-fg);"/>
+        <span id="rec-all-label">전체 선택</span>
+      </label>
+      <button id="rec-del-sel-btn" onclick="bulkDeleteRecords()" disabled style="background:var(--rd-fg);color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;opacity:.5;">선택 삭제 (0명)</button>
     </div>
     <div id="rec-list"><div class="empty-msg">📋 아직 출석 기록이 없어요</div></div>
   </div>
@@ -552,7 +567,7 @@ select, input, button { min-width: 0; box-sizing: border-box; }
   </div>
 
   <div class="adm-sec">
-    <div class="adm-sec-ttl">엑셀 학생 관리</div>
+    <div class="adm-sec-ttl">학생 관리</div>
     <div class="card">
       <!-- 현재 명단 다운로드 -->
       <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--bdr);">
@@ -590,6 +605,11 @@ select, input, button { min-width: 0; box-sizing: border-box; }
         <button class="excel-upload-btn" id="excel-edit-btn" onclick="uploadExcelEdit()">일괄 수정하기</button>
       </div>
     </div>
+  </div>
+
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">교사 관리</div>
+    <button class="change-dept-btn" onclick="openTeacherAdmin()" style="background:#eaf2f8;color:#1a5276;border-color:#aed6f1;">👨‍🏫 교사 명단 관리하기</button>
   </div>
 
   <div class="adm-sec">
@@ -687,7 +707,84 @@ select, input, button { min-width: 0; box-sizing: border-box; }
   </div>
 </div>
 
-<!-- ════════════ 보고자료 화면 ════════════ -->
+<!-- ════════════ 교사 관리 화면 ════════════ -->
+<div id="s-teacher" class="screen">
+  <div class="adm-hdr" style="background:#1a5276;">
+    <button class="back-btn" onclick="closeTeacherAdmin()">←</button>
+    <h2>👨‍🏫 교사 명단 관리</h2>
+  </div>
+
+  <!-- 개별 추가 -->
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">교사 개별 추가</div>
+    <div class="card">
+      <div class="add-row">
+        <input class="inp" id="new-t-role" type="text" placeholder="직분" style="width:80px;min-width:56px;flex:0 0 80px;" onkeydown="if(event.key==='Enter')addTeacher()"/>
+        <input class="inp name-inp" id="new-t-name" type="text" placeholder="이름 입력" onkeydown="if(event.key==='Enter')addTeacher()"/>
+      </div>
+      <div class="add-row" style="margin-top:8px;">
+        <input class="inp" id="new-t-grade" type="text" placeholder="담당학년 (선택)" style="flex:1;" onkeydown="if(event.key==='Enter')addTeacher()"/>
+        <input class="inp" id="new-t-cls" type="text" placeholder="담당반" style="width:80px;min-width:56px;flex:0 0 80px;" onkeydown="if(event.key==='Enter')addTeacher()"/>
+        <button class="add-btn" onclick="addTeacher()">추가</button>
+      </div>
+      <p class="excel-desc" style="margin-top:8px;">직분 예: 부장, 교사, 총무 등 · 담당학년/반은 선택 입력</p>
+    </div>
+  </div>
+
+  <!-- 엑셀 교사 관리 -->
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">엑셀 교사 관리</div>
+    <div class="card">
+      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--bdr);">
+        <div style="font-size:14px;font-weight:700;color:#1a5276;margin-bottom:6px;">① 현재 명단 다운로드</div>
+        <p class="excel-desc" style="margin-bottom:8px;">등록된 교사 전체를 엑셀로 내려받아요. (고유코드 포함)</p>
+        <button class="excel-tpl-btn" style="width:100%;" onclick="downloadTeacherList()">📥 현재 교사 명단 다운로드</button>
+      </div>
+      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--bdr);">
+        <div style="font-size:14px;font-weight:700;color:#1a5276;margin-bottom:6px;">② 신규 교사 일괄 등록</div>
+        <p class="excel-desc" style="margin-bottom:8px;"><b>A열: 이름 / B열: 직분 / C열: 담당학년 / D열: 담당반</b> 형식으로 등록해요.</p>
+        <div class="excel-btns">
+          <label class="excel-select-btn" for="t-excel-file">📂 신규 등록 파일 선택</label>
+          <button class="excel-tpl-btn" onclick="downloadTeacherTemplate()">📋 샘플 양식</button>
+        </div>
+        <input type="file" id="t-excel-file" accept=".xlsx,.xls" style="display:none" onchange="onTeacherExcelFile(event)"/>
+        <div class="excel-preview" id="t-excel-preview">
+          <div class="excel-preview-hdr"><span id="t-preview-count">미리보기</span></div>
+          <div class="excel-preview-list" id="t-preview-list"></div>
+        </div>
+        <button class="excel-upload-btn" id="t-excel-upload-btn" onclick="uploadTeacherExcel()">일괄 등록하기</button>
+      </div>
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#1a5276;margin-bottom:6px;">③ 교사 정보 일괄 수정</div>
+        <p class="excel-desc" style="margin-bottom:8px;">①에서 받은 명단을 고쳐서 올리면 <b>고유코드로 매칭해 수정만</b> 이루어져요.</p>
+        <label class="excel-select-btn" for="t-excel-edit-file" style="width:100%;box-sizing:border-box;">📝 수정 파일 선택</label>
+        <input type="file" id="t-excel-edit-file" accept=".xlsx,.xls" style="display:none" onchange="onTeacherExcelEditFile(event)"/>
+        <div class="excel-preview" id="t-excel-edit-preview">
+          <div class="excel-preview-hdr"><span id="t-edit-preview-count">미리보기</span><span style="font-weight:400">✎=수정 대상</span></div>
+          <div class="excel-preview-list" id="t-edit-preview-list"></div>
+        </div>
+        <button class="excel-upload-btn" id="t-excel-edit-btn" onclick="uploadTeacherExcelEdit()">일괄 수정하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 교사 목록 -->
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">등록된 교사 <span id="teacher-count" style="font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+    <div class="stu-ctrl-bar">
+      <input class="stu-search-inp" id="teacher-search" type="text" placeholder="🔍 이름 검색..." oninput="renderTeacherList()"/>
+    </div>
+    <div class="stu-bulk-bar">
+      <label class="stu-all-wrap">
+        <input type="checkbox" id="teacher-select-all" onchange="toggleTeacherSelectAll(this)"/>
+        <span id="teacher-all-label">전체 선택</span>
+      </label>
+      <button class="stu-del-sel" id="teacher-del-btn" onclick="bulkDeleteTeachers()" disabled>선택 삭제 (0명)</button>
+    </div>
+    <div id="teacher-list"></div>
+  </div>
+</div>
+
 <!-- ════════════ 교육부 출석 통계 화면 ════════════ -->
 <div id="s-stats" class="screen">
   <div class="adm-hdr" style="background:#1a5276;">
@@ -858,17 +955,31 @@ select, input, button { min-width: 0; box-sizing: border-box; }
       <!-- 교사 출석 -->
       <div class="rpt-stat-row">
         <span class="rpt-stat-lbl">교사 출석</span>
-        <input type="number" id="rpt-teacher-attend" min="0" value="0"
-               style="width:64px;padding:6px 10px;font-size:22px;font-weight:700;color:var(--pr-dk);border:1.5px solid var(--bdr);border-radius:var(--r);background:#f7f7f7;text-align:right;"/>
+        <span class="rpt-stat-val" id="rpt-teacher-attend-val">-</span>
         <span class="rpt-stat-unit">명</span>
+        <button class="stat-edit-btn" onclick="editTeacherAttend()" title="수정">✏️</button>
       </div>
       <!-- 교사 결석 -->
       <div class="rpt-visitor-sec" style="border-top:1px solid var(--bdr);">
         <div class="rpt-visitor-hdr">
-          <span class="rpt-stat-lbl" style="font-size:15px;">교사 결석</span>
-          <button class="rpt-add-btn" onclick="addAbsTeacher()">＋ 추가</button>
+          <span class="rpt-stat-lbl" style="font-size:15px;">교사 결석 <span id="abs-teacher-cnt" style="font-size:13px;color:var(--muted);font-weight:400;"></span></span>
+          <button class="rpt-add-btn" onclick="openAbsTeacherGrid()">＋ 추가</button>
         </div>
         <div id="rpt-abs-teachers"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 교사 결석 선택 그리드 모달 -->
+  <div class="overlay" id="abs-teacher-modal">
+    <div class="modal" style="max-width:430px;width:92%;max-height:78vh;display:flex;flex-direction:column;padding:0;overflow:hidden;border-radius:18px;">
+      <div style="padding:16px 18px;background:var(--pr-pl);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <div style="font-size:16px;font-weight:700;color:var(--pr-dk);">결석 교사 선택 <span id="abs-sel-cnt" style="color:var(--pr);"></span></div>
+        <button onclick="closeModal('abs-teacher-modal')" style="background:none;border:none;font-size:24px;color:var(--pr-dk);cursor:pointer;line-height:1;padding:0 2px;">×</button>
+      </div>
+      <div id="abs-teacher-grid-body" style="padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
+      <div style="padding:12px 16px;border-top:1px solid var(--bdr);flex-shrink:0;">
+        <button class="mbtn mbtn-p" onclick="confirmAbsTeachers()" style="margin:0;">완료</button>
       </div>
     </div>
   </div>
@@ -983,6 +1094,28 @@ select, input, button { min-width: 0; box-sizing: border-box; }
   </div>
 </div>
 
+<!-- 교사 정보 수정 모달 -->
+<div class="overlay" id="edit-teacher-modal">
+  <div class="modal">
+    <h3>✏️ 교사 정보 수정</h3>
+    <div style="display:flex;flex-direction:column;gap:10px;margin:16px 0;">
+      <input class="inp" id="edit-t-role" type="text" placeholder="직분 (예: 교사, 부장)"
+             style="width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);"/>
+      <input class="inp" id="edit-t-grade" type="text" placeholder="담당학년 (선택)"
+             style="width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);"/>
+      <input class="inp" id="edit-t-cls" type="text" placeholder="담당반 (선택)"
+             style="width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);"/>
+      <input class="inp" id="edit-t-name" type="text" placeholder="이름 입력"
+             style="width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);"
+             onkeydown="if(event.key==='Enter')saveEditTeacher()"/>
+    </div>
+    <div class="pw-err" id="edit-t-err"></div>
+    <button class="mbtn mbtn-p" onclick="saveEditTeacher()">저장</button>
+    <button class="mbtn mbtn-s" onclick="deleteTeacherFromModal()" style="color:var(--rd-fg);">삭제</button>
+    <button class="mbtn mbtn-s" onclick="closeModal('edit-teacher-modal')">취소</button>
+  </div>
+</div>
+
 <!-- 부서 활성화/비활성화 관리 시트 -->
 <div class="dept-admin-overlay" id="dept-admin-overlay">
   <div class="dept-admin-sheet">
@@ -1022,6 +1155,8 @@ let parsedXlsx     = [];
 let stuSearchQuery = '';
 let bulkMode       = false;       // 일괄 출석 모드
 let bulkSelected   = new Set();   // 일괄 출석 선택된 학생 키
+let recEditMode    = false;       // 출석 기록 편집 모드
+let selectedRecKeys= new Set();   // 출석 편집 선택된 기록 키
 let stuFilterGrade = '';
 let selectedStuKeys= new Set();
 // ★ 보고자료 날짜 스피너
@@ -1228,6 +1363,10 @@ function selectDept(dept, showLoading=true){
 
   // 일괄 출석 모드 초기화 (부서 진입 시 닫힌 상태)
   bulkMode = false; bulkSelected.clear();
+  // 출석 편집 모드 초기화
+  recEditMode = false; selectedRecKeys.clear();
+  const _reb = document.getElementById('rec-edit-bar'); if(_reb) _reb.style.display='none';
+  const _rebtn = document.getElementById('rec-edit-btn'); if(_rebtn){ _rebtn.textContent='편집'; _rebtn.style.background='#eef2f7'; _rebtn.style.color='#1a5276'; }
   const bp = document.getElementById('bulk-panel');
   const bt = document.getElementById('bulk-toggle-btn');
   if(bp) bp.style.display = 'none';
@@ -1374,7 +1513,7 @@ function renderRecords(records, showTime){
   }
   const el=document.getElementById('rec-list');
   if(!records.length){ el.innerHTML='<div class="empty-msg">📋 아직 출석 기록이 없어요</div>'; return; }
-  el.innerHTML=records.map(r=>{
+  el.innerHTML=records.map((r,idx)=>{
     let rightSide;
     if(r._failed){
       rightSide = `<span class="badge bf">저장실패</span>`;
@@ -1383,11 +1522,22 @@ function renderRecords(records, showTime){
     } else {
       rightSide = `<span class="badge ${r.status==='출석'?'bp':'bl'}">${esc(r.status)}</span>`;
     }
+    // 편집 모드: 저장 완료된 기록에 체크박스 표시
+    if(recEditMode && !r._pending){
+      const key = r.name+'__'+r.grade;
+      const checked = selectedRecKeys.has(key);
+      return `<div class="rec-row rec-editable${checked?' rec-checked':''}" onclick="toggleRecSelect('${esc(key)}')">
+        <label class="rec-check-wrap"><input type="checkbox" ${checked?'checked':''} style="width:20px;height:20px;accent-color:var(--rd-fg);pointer-events:none;"/></label>
+        <div class="rec-info"><div class="r-name">${esc(dispName(r))}</div><div class="r-meta">${esc(r.grade)}${(useClass()&&r.cls)?' · '+esc(r.cls)+'반':''}</div></div>
+        <div class="rec-right">${rightSide}</div>
+      </div>`;
+    }
     return `<div class="rec-row${r._pending?' rec-pending':''}">
-      <div><div class="r-name">${esc(dispName(r))}</div><div class="r-meta">${esc(r.grade)}${(useClass()&&r.cls)?' · '+esc(r.cls)+'반':''}</div></div>
-      ${rightSide}
+      <div class="rec-info"><div class="r-name">${esc(dispName(r))}</div><div class="r-meta">${esc(r.grade)}${(useClass()&&r.cls)?' · '+esc(r.cls)+'반':''}</div></div>
+      <div class="rec-right">${rightSide}</div>
     </div>`;
   }).join('');
+  updateRecDelBtn();
 }
 
 // ── ★ 헬퍼 함수 ──────────────────────────────────────────────
@@ -1775,6 +1925,90 @@ function syncServerRecords(serverRecords){
   renderRecords(merged, true);
   // 일괄 출석 패널이 열려있으면 출석완료 표시 갱신
   if(bulkMode) renderBulkList();
+}
+
+// ── ★ 출석 기록 편집 모드 (체크박스 일괄 삭제) ────────────────
+function toggleRecEdit(){
+  recEditMode = !recEditMode;
+  selectedRecKeys.clear();
+  const bar = document.getElementById('rec-edit-bar');
+  const btn = document.getElementById('rec-edit-btn');
+  if(bar) bar.style.display = recEditMode ? 'flex' : 'none';
+  if(btn){
+    btn.textContent = recEditMode ? '완료' : '편집';
+    btn.style.background = recEditMode ? '#1a5276' : '#eef2f7';
+    btn.style.color = recEditMode ? '#fff' : '#1a5276';
+  }
+  const allCb = document.getElementById('rec-select-all');
+  if(allCb) allCb.checked = false;
+  renderRecords(getCache(), false);
+}
+
+function toggleRecSelect(key){
+  if(selectedRecKeys.has(key)) selectedRecKeys.delete(key);
+  else selectedRecKeys.add(key);
+  renderRecords(getCache(), false);
+  // 전체선택 체크박스 동기화
+  const saved = getCache().filter(r=>!r._pending);
+  const allCb = document.getElementById('rec-select-all');
+  if(allCb) allCb.checked = saved.length>0 && selectedRecKeys.size===saved.length;
+}
+
+function toggleRecSelectAll(cb){
+  selectedRecKeys.clear();
+  if(cb.checked){
+    getCache().filter(r=>!r._pending).forEach(r=>selectedRecKeys.add(r.name+'__'+r.grade));
+  }
+  renderRecords(getCache(), false);
+}
+
+function updateRecDelBtn(){
+  const btn = document.getElementById('rec-del-sel-btn');
+  if(!btn) return;
+  const n = selectedRecKeys.size;
+  btn.disabled = n===0;
+  btn.style.opacity = n===0 ? '.5' : '1';
+  btn.textContent = `선택 삭제 (${n}명)`;
+}
+
+async function bulkDeleteRecords(){
+  if(selectedRecKeys.size===0) return;
+  const keys = [...selectedRecKeys];
+  if(!confirm(`선택한 ${keys.length}명의 출석 기록을 삭제하시겠습니까?`)) return;
+
+  // 삭제 대상 목록
+  const targets = keys.map(k=>{ const i=k.indexOf('__'); return {name:k.slice(0,i), grade:k.slice(i+2)}; });
+
+  // 화면에서 즉시 제거 (낙관적)
+  const cached = getCache();
+  const filtered = cached.filter(r => !selectedRecKeys.has(r.name+'__'+r.grade));
+  setCache(filtered);
+  selectedRecKeys.clear();
+  renderRecords(filtered, true);
+
+  setLoading(true, `${targets.length}명 삭제 중...`);
+  let failed = 0;
+  try{
+    // 순차 삭제 (충돌 방지)
+    for(let i=0;i<targets.length;i++){
+      setLoading(true, `삭제 중... (${i+1}/${targets.length})`);
+      try{
+        const data = await api({action:'deleteRecord', name:targets[i].name, grade:targets[i].grade});
+        if(data.error) throw new Error(data.error);
+      }catch(e){ failed++; }
+    }
+    // 서버 기준 최종 동기화
+    const d = await api({action:'records'});
+    if(d.records) syncServerRecords(d.records);
+    showToast(failed>0 ? `${targets.length-failed}명 삭제 · ${failed}명 실패` : `${targets.length}명 삭제 완료`);
+  }catch(e){
+    showToast('삭제 중 오류: '+e.message);
+    try{ const d=await api({action:'records'}); setCache(d.records||[]); renderRecords(d.records||[],true); }catch(_){}
+  }finally{
+    setLoading(false);
+    const allCb = document.getElementById('rec-select-all');
+    if(allCb) allCb.checked = false;
+  }
 }
 
 // 저장 최종 실패한 레코드를 화면에서 표시
@@ -2789,6 +3023,9 @@ function scheduleFetchRptStats(){
 }
 
 // 출석 = 남(재적) + 여(재적) 자동 계산
+// 성별 미입력 출석자 수 (남+여로 안 잡히는 인원 보정용)
+let _attendUnknownGender = 0;
+
 function recalcAttend(){
   const m = parseInt(document.getElementById('rpt-m-attend')?.textContent) || 0;
   const f = parseInt(document.getElementById('rpt-f-attend')?.textContent) || 0;
@@ -2796,7 +3033,8 @@ function recalcAttend(){
   const vm = document.getElementById('rpt-visitors-m')?.querySelectorAll('.rpt-visitor-row').length || 0;
   const vf = document.getElementById('rpt-visitors-f')?.querySelectorAll('.rpt-visitor-row').length || 0;
   const elA = document.getElementById('rpt-attend');
-  if(elA) elA.textContent = m + f + vm + vf;  // 재적 출석 + 방문 인원
+  // 재적 출석(남+여+성별미입력) + 방문 인원
+  if(elA) elA.textContent = m + f + _attendUnknownGender + vm + vf;
 }
 
 // 학년별 재적·출석 집계 표 렌더 (앱 UI)
@@ -2852,14 +3090,17 @@ async function fetchRptStats(){
     const data = await api({action:'recordsByDate', date:dateStr});
     if(data.error) throw new Error(data.error);
     const rec = data.records||[];
+    const maleCnt   = rec.filter(r=>String(r.gender||'').trim().startsWith('남')).length;
+    const femaleCnt = rec.filter(r=>String(r.gender||'').trim().startsWith('여')).length;
+    _attendUnknownGender = rec.length - maleCnt - femaleCnt;  // 성별 미입력자
     const elR = document.getElementById('rpt-roster');
     const elM = document.getElementById('rpt-m-attend');
     const elF = document.getElementById('rpt-f-attend');
     // 수기 수정된 항목은 덮어쓰지 않음
     if(elR && !statEdited.roster){ elR.textContent = students.length; elR.classList.remove('edited'); }
-    if(elM && !statEdited.m){ elM.textContent = rec.filter(r=>r.gender==='남').length; elM.classList.remove('edited'); }
-    if(elF && !statEdited.f){ elF.textContent = rec.filter(r=>r.gender==='여').length; elF.classList.remove('edited'); }
-    recalcAttend();  // 출석 = 남 + 여 자동 계산
+    if(elM && !statEdited.m){ elM.textContent = maleCnt;   elM.classList.remove('edited'); }
+    if(elF && !statEdited.f){ elF.textContent = femaleCnt; elF.classList.remove('edited'); }
+    recalcAttend();  // 출석 = 남+여+미입력+방문
     renderGradeStats(rec);  // 학년별 재적·출석 표
     if(note) note.textContent = `${rptY}년 ${rptM}월 ${rptD}일 출석 기준`;
   }catch(e){
@@ -2889,18 +3130,56 @@ function editStat(type){
 }
 
 // 출석체크 데이터로 다시 동기화 (수기 수정 해제)
-function resyncStats(){
-  statEdited = { roster:false, m:false, f:false };  // 수기 수정 해제
+// 출석체크 데이터로 즉시 강제 동기화 (수기 수정 무시하고 실제 출석으로)
+async function resyncStats(){
+  // 모든 수기 수정 해제
+  statEdited = { roster:false, m:false, f:false };
   ['rpt-roster','rpt-m-attend','rpt-f-attend'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.classList.remove('edited');
   });
-  fetchRptStats();  // 선택된 날짜의 출석체크 데이터로 재조회
-  showToast('등록·출석 데이터로 동기화했습니다');
+  const note = document.getElementById('rpt-stat-note');
+  const ids = ['rpt-attend','rpt-m-attend','rpt-f-attend'];
+  ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='…'; });
+  if(note) note.textContent = '동기화 중...';
+  setLoading(true, '출석 데이터 동기화 중...');
+  try{
+    const dateStr = `${rptY}-${String(rptM).padStart(2,'0')}-${String(rptD).padStart(2,'0')}`;
+    const data = await api({action:'recordsByDate', date:dateStr});
+    if(data.error) throw new Error(data.error);
+    const rec = data.records||[];
+    // 성별 분류 (남/여 유연 매칭)
+    const maleCnt   = rec.filter(r=>String(r.gender||'').trim().startsWith('남')).length;
+    const femaleCnt = rec.filter(r=>String(r.gender||'').trim().startsWith('여')).length;
+    _attendUnknownGender = rec.length - maleCnt - femaleCnt;  // 성별 미입력자
+
+    const elR = document.getElementById('rpt-roster');
+    const elM = document.getElementById('rpt-m-attend');
+    const elF = document.getElementById('rpt-f-attend');
+    if(elR){ elR.textContent = students.length; elR.classList.remove('edited'); }
+    if(elM){ elM.textContent = maleCnt;   elM.classList.remove('edited'); }
+    if(elF){ elF.textContent = femaleCnt; elF.classList.remove('edited'); }
+    recalcAttend();  // 출석 = 남+여+미입력+방문
+    renderGradeStats(rec);
+    // 남+여 합이 실제 출석과 다르면 (성별 미입력자 존재) 안내
+    if(_attendUnknownGender > 0){
+      if(note) note.textContent = `동기화 완료 · 출석 ${rec.length}명 (성별 미입력 ${_attendUnknownGender}명 포함)`;
+    } else {
+      if(note) note.textContent = `동기화 완료 · ${rptY}년 ${rptM}월 ${rptD}일 기준`;
+    }
+    showToast(`출석 ${rec.length}명으로 동기화했습니다`);
+  }catch(e){
+    ids.forEach(id=>{ const el=document.getElementById(id); if(el && el.textContent==='…') el.textContent='-'; });
+    if(note) note.textContent = '동기화 실패 — 다시 시도해주세요';
+    showToast('동기화 실패: '+e.message, 4000);
+  }finally{
+    setLoading(false);
+  }
 }
 
 function initRptStats(){
   // 수기 수정 상태 초기화
   statEdited = { roster:false, m:false, f:false };
+  _attendUnknownGender = 0;
   ['rpt-roster','rpt-m-attend','rpt-f-attend'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.classList.remove('edited');
   });
@@ -2915,12 +3194,16 @@ function initRptStats(){
   const vm = document.getElementById('rpt-visitors-m');
   const vf = document.getElementById('rpt-visitors-f');
   const at = document.getElementById('rpt-abs-teachers');
-  const ta = document.getElementById('rpt-teacher-attend');
   if(vm) vm.innerHTML = '';
   if(vf) vf.innerHTML = '';
   if(at) at.innerHTML = '';
-  if(ta) ta.value = '0';
   visitorCnt = 0; absTeacherCnt = 0;
+  // 교사 출석 초기화 + 교사 명단 로드 (등록 교사 수로 동기화)
+  teacherAttendEdited = false;
+  const tav = document.getElementById('rpt-teacher-attend-val');
+  if(tav){ tav.textContent='…'; tav.classList.remove('edited'); }
+  updateAbsTeacherCnt();
+  loadRptTeachers();
   // 행사 / 건의사항 초기화
   const ev = document.getElementById('rpt-events');
   const sg = document.getElementById('rpt-suggestions');
@@ -2955,24 +3238,135 @@ function removeVisitor(id){
 }
 
 let absTeacherCnt = 0;
+// ── ★ 교사 출석 (등록 교사 수 동기화 + 수기 수정) ──────────────
+let teacherAttendEdited = false;
+let _rptTeachers = [];  // 보고서 화면용 교사 명단
+
+async function loadRptTeachers(){
+  // 교사 명단 불러오기 (교사 출석 동기화 + 결석 선택용)
+  try{
+    const data = await api({action:'teachers'});
+    _rptTeachers = data.teachers || [];
+  }catch(e){ _rptTeachers = []; }
+  syncTeacherAttend();
+}
+
+function syncTeacherAttend(){
+  const el = document.getElementById('rpt-teacher-attend-val');
+  if(!el) return;
+  if(!teacherAttendEdited){
+    // 등록 교사 수 - 결석 교사 수
+    const absCnt = getAbsTeachers().length;
+    const present = Math.max(0, _rptTeachers.length - absCnt);
+    el.textContent = present;
+    el.classList.remove('edited');
+  }
+}
+
+function editTeacherAttend(){
+  const el = document.getElementById('rpt-teacher-attend-val');
+  if(!el) return;
+  const cur = parseInt(el.textContent) || 0;
+  const input = prompt('교사 출석 인원을 입력하세요', cur);
+  if(input === null) return;
+  const num = parseInt(input);
+  if(isNaN(num) || num < 0){ showToast('0 이상의 숫자를 입력해주세요'); return; }
+  el.textContent = num;
+  el.classList.add('edited');
+  teacherAttendEdited = true;
+}
+
+// ── ★ 교사 결석 (그리드 선택 방식) ─────────────────────────────
+let _absSelected = new Set();  // 그리드에서 선택된 교사 uid
+
+async function openAbsTeacherGrid(){
+  // 교사 명단이 없으면 먼저 로드
+  if(!_rptTeachers.length){
+    setLoading(true, '교사 명단 불러오는 중...');
+    try{ const data = await api({action:'teachers'}); _rptTeachers = data.teachers||[]; }
+    catch(e){ showToast('교사 명단을 불러올 수 없습니다'); setLoading(false); return; }
+    setLoading(false);
+  }
+  if(!_rptTeachers.length){ showToast('등록된 교사가 없습니다. 먼저 교사를 등록해주세요.'); return; }
+
+  // 이미 결석으로 추가된 교사는 미리 선택 표시
+  const already = new Set(getAbsTeachers().map(t=>t.uid).filter(Boolean));
+  _absSelected = new Set(already);
+  renderAbsTeacherGrid();
+  openModal('abs-teacher-modal');
+}
+
+function renderAbsTeacherGrid(){
+  const body = document.getElementById('abs-teacher-grid-body');
+  if(!body) return;
+  // 직분 → 이름 정렬
+  const sorted = _rptTeachers.slice().sort((a,b)=>{
+    const r = String(a.role||'').localeCompare(String(b.role||''),'ko');
+    if(r!==0) return r;
+    return String(a.name).localeCompare(String(b.name),'ko');
+  });
+  body.innerHTML = '<div class="bible-grid g-book">' + sorted.map(t=>{
+    const sel = _absSelected.has(t.uid) ? ' sel' : '';
+    const sub = [t.role,(useClass()&&t.cls?t.cls+'반':'')].filter(Boolean).join(' ');
+    return `<div class="bible-grid-cell${sel}" onclick="toggleAbsTeacher('${esc(t.uid)}')" style="flex-direction:column;line-height:1.2;">
+      ${esc(t.name)}${sub?`<span style="font-size:10px;opacity:.7;">${esc(sub)}</span>`:''}
+    </div>`;
+  }).join('') + '</div>';
+  const cntEl = document.getElementById('abs-sel-cnt');
+  if(cntEl) cntEl.textContent = _absSelected.size>0 ? `(${_absSelected.size}명)` : '';
+}
+
+function toggleAbsTeacher(uid){
+  if(_absSelected.has(uid)) _absSelected.delete(uid);
+  else _absSelected.add(uid);
+  renderAbsTeacherGrid();
+}
+
+function confirmAbsTeachers(){
+  // 기존 결석 목록의 사유 보존
+  const existing = {};
+  getAbsTeachers().forEach(t=>{ if(t.uid) existing[t.uid] = t.reason; });
+  // 컨테이너 비우고 선택된 교사로 재구성
+  const container = document.getElementById('rpt-abs-teachers');
+  if(container) container.innerHTML = '';
+  absTeacherCnt = 0;
+  _rptTeachers.filter(t=>_absSelected.has(t.uid)).forEach(t=>{
+    addAbsTeacher({ uid:t.uid, name:t.name, role:t.role, reason: existing[t.uid]||'' });
+  });
+  closeModal('abs-teacher-modal');
+  updateAbsTeacherCnt();
+  syncTeacherAttend();  // 결석 수 반영해 출석 재계산
+}
+
 function addAbsTeacher(data={}){
   const container = document.getElementById('rpt-abs-teachers');
   if(!container) return;
   const id = ++absTeacherCnt;
   const row = document.createElement('div');
-  row.className = 'rpt-visitor-row';
+  row.className = 'rpt-visitor-row abs-teacher-row';
   row.id = `atrow-${id}`;
+  row.dataset.uid = data.uid || '';
+  const displayName = data.name ? (data.role ? `${data.name} (${data.role})` : data.name) : '';
   row.innerHTML = `
-    <input class="rpt-vinp" type="text" placeholder="이름" value="${data.name||''}"/>
-    <input class="rpt-vinp" type="text" placeholder="결석 사유" value="${data.reason||''}"/>
+    <div class="abs-teacher-name">${esc(displayName)}</div>
+    <input class="rpt-vinp" type="text" placeholder="결석 사유" value="${esc(data.reason||'')}"/>
     <button class="rpt-vdel" onclick="removeAbsTeacher(${id})">✕</button>`;
   container.appendChild(row);
-  if(!data.name) row.querySelector('input').focus();
+  updateAbsTeacherCnt();
 }
 
 function removeAbsTeacher(id){
   const el = document.getElementById(`atrow-${id}`);
   if(el) el.remove();
+  updateAbsTeacherCnt();
+  syncTeacherAttend();  // 결석 수 변동 → 출석 재계산
+}
+
+function updateAbsTeacherCnt(){
+  const container = document.getElementById('rpt-abs-teachers');
+  const n = container ? container.querySelectorAll('.abs-teacher-row').length : 0;
+  const el = document.getElementById('abs-teacher-cnt');
+  if(el) el.textContent = n>0 ? `(${n}명)` : '';
 }
 
 // 방문자 데이터 읽기 (나중에 보고서 출력 시 사용)
@@ -3085,7 +3479,8 @@ function collectReportData(){
     },
     sermon: document.getElementById('rpt-sermon')?.value||'',
     prayer: document.getElementById('rpt-prayer')?.value||'',
-    teacherAttend: document.getElementById('rpt-teacher-attend')?.value||'0',
+    teacherAttend: document.getElementById('rpt-teacher-attend-val')?.textContent||'0',
+    teacherAttendEdited: teacherAttendEdited,
     absTeachers: getAbsTeachers(),
     visitorsM:   getVisitors('m'),
     visitorsF:   getVisitors('f'),
@@ -3098,10 +3493,15 @@ function collectReportData(){
 
 function getAbsTeachers(){
   const c=document.getElementById('rpt-abs-teachers'); if(!c) return [];
-  return [...c.querySelectorAll('.rpt-visitor-row')].map(row=>{
-    const i=row.querySelectorAll('input');
-    return {name:i[0]?.value.trim()||'', reason:i[1]?.value.trim()||''};
-  }).filter(t=>t.name||t.reason);
+  return [...c.querySelectorAll('.abs-teacher-row')].map(row=>{
+    const nameEl = row.querySelector('.abs-teacher-name');
+    const reasonEl = row.querySelector('.rpt-vinp');
+    return {
+      uid: row.dataset.uid || '',
+      name: (nameEl?.textContent||'').trim(),
+      reason: reasonEl?.value.trim() || ''
+    };
+  }).filter(t=>t.name);
 }
 
 // 폼에 데이터 적용
@@ -3148,10 +3548,12 @@ function applyReportData(draft){
   // 텍스트 필드
   const s=document.getElementById('rpt-sermon');
   const p=document.getElementById('rpt-prayer');
-  const ta=document.getElementById('rpt-teacher-attend');
   if(s) s.value=draft.sermon||'';
   if(p) p.value=draft.prayer||'';
-  if(ta) ta.value=draft.teacherAttend||'0';
+  // 교사 출석 복원
+  const tav=document.getElementById('rpt-teacher-attend-val');
+  teacherAttendEdited = !!draft.teacherAttendEdited;
+  if(tav && teacherAttendEdited){ tav.textContent=draft.teacherAttend||'0'; tav.classList.add('edited'); }
   // 방문자
   const vm=document.getElementById('rpt-visitors-m');
   const vf=document.getElementById('rpt-visitors-f');
@@ -3167,6 +3569,7 @@ function applyReportData(draft){
   (draft.visitorsM||[]).forEach(v=>addVisitor('m',v));
   (draft.visitorsF||[]).forEach(v=>addVisitor('f',v));
   (draft.absTeachers||[]).forEach(t=>addAbsTeacher(t));
+  updateAbsTeacherCnt();
   (draft.events||[]).forEach(e=>addEvent(e));
   (draft.suggestions||[]).forEach(s=>addSuggestion(s));
   recalcAttend();  // 방문 인원 포함 출석 총합 갱신
@@ -3868,6 +4271,368 @@ function downloadStatsExcel(){
   const monthLabel = months.join('_');
   XLSX.utils.book_append_sheet(wb, ws, '출석통계');
   XLSX.writeFile(wb, `교육부_출석통계_${year}년_${monthLabel}월.xlsx`);
+}
+
+// ══════════════════════════════════════════════════════════════
+// ★ 교사 명단 관리
+// ══════════════════════════════════════════════════════════════
+let teachers = [];
+let selectedTeacherUids = new Set();
+let parsedTeacherXlsx = [];
+let parsedTeacherEditXlsx = [];
+
+function openTeacherAdmin(){
+  showScreen('s-teacher');
+  window.scrollTo(0,0);
+  fetchTeachers();
+}
+function closeTeacherAdmin(){
+  showScreen('s-admin');
+  window.scrollTo(0,0);
+}
+
+async function fetchTeachers(){
+  setLoading(true,'교사 명단 불러오는 중...');
+  try{
+    const data = await api({action:'teachers'});
+    if(data.error) throw new Error(data.error);
+    teachers = data.teachers || [];
+    selectedTeacherUids.clear();
+    renderTeacherList();
+  }catch(e){ showToast('오류: '+e.message); }
+  finally{ setLoading(false); }
+}
+
+function renderTeacherList(){
+  const el = document.getElementById('teacher-list');
+  const cnt = document.getElementById('teacher-count');
+  if(cnt) cnt.textContent = teachers.length ? `(${teachers.length}명)` : '';
+  if(!el) return;
+  const q = (document.getElementById('teacher-search')?.value || '').trim().toLowerCase();
+  let list = teachers.slice();
+  if(q) list = list.filter(t=>t.name.toLowerCase().includes(q));
+  // 직분 → 학년 → 이름 정렬
+  list.sort((a,b)=>{
+    const r = String(a.role).localeCompare(String(b.role),'ko');
+    if(r!==0) return r;
+    const g = String(a.grade||'').localeCompare(String(b.grade||''),'ko',{numeric:true});
+    if(g!==0) return g;
+    return String(a.name).localeCompare(String(b.name),'ko');
+  });
+  if(!list.length){ el.innerHTML='<div class="empty-msg" style="padding:20px;">등록된 교사가 없습니다</div>'; updateTeacherDelBtn(); return; }
+  el.innerHTML = list.map(t=>{
+    const checked = selectedTeacherUids.has(t.uid);
+    const meta = [t.role, (t.grade?t.grade:''), (t.cls?t.cls+'반':'')].filter(Boolean).join(' · ');
+    return `<div class="stu-row">
+      <label class="stu-check-wrap">
+        <input type="checkbox" ${checked?'checked':''} onchange="toggleTeacherSelect('${esc(t.uid)}')"/>
+      </label>
+      <div class="stu-info" onclick="openEditTeacher('${esc(t.uid)}')">
+        <div class="stu-name">${esc(t.name)}</div>
+        <span class="stu-grade">${esc(meta||'-')}</span>
+      </div>
+      <button class="edit-btn" onclick="openEditTeacher('${esc(t.uid)}')">✏️</button>
+    </div>`;
+  }).join('');
+  updateTeacherDelBtn();
+}
+
+function toggleTeacherSelect(uid){
+  if(selectedTeacherUids.has(uid)) selectedTeacherUids.delete(uid);
+  else selectedTeacherUids.add(uid);
+  updateTeacherDelBtn();
+  const all = document.getElementById('teacher-select-all');
+  if(all) all.checked = teachers.length>0 && selectedTeacherUids.size===teachers.length;
+}
+function toggleTeacherSelectAll(cb){
+  selectedTeacherUids.clear();
+  if(cb.checked) teachers.forEach(t=>selectedTeacherUids.add(t.uid));
+  renderTeacherList();
+}
+function updateTeacherDelBtn(){
+  const btn = document.getElementById('teacher-del-btn');
+  if(!btn) return;
+  const n = selectedTeacherUids.size;
+  btn.disabled = n===0;
+  btn.textContent = `선택 삭제 (${n}명)`;
+}
+
+async function addTeacher(){
+  const name = document.getElementById('new-t-name').value.trim();
+  const role = document.getElementById('new-t-role').value.trim();
+  const grade= document.getElementById('new-t-grade').value.trim();
+  const cls  = document.getElementById('new-t-cls').value.trim();
+  if(!name){ showToast('이름을 입력해주세요'); return; }
+  setLoading(true,'추가 중...');
+  try{
+    const data = await api({action:'addTeacher', name, role, grade, cls});
+    if(data.duplicate){ showToast('이미 동일한 교사가 있습니다'); return; }
+    if(data.error){ showToast('오류: '+data.error); return; }
+    teachers = data.teachers||[];
+    document.getElementById('new-t-name').value='';
+    document.getElementById('new-t-role').value='';
+    document.getElementById('new-t-grade').value='';
+    document.getElementById('new-t-cls').value='';
+    renderTeacherList();
+    showToast(`${name} 추가 완료 ✓`);
+  }catch(e){ showToast('연결 오류: '+e.message); }
+  finally{ setLoading(false); }
+}
+
+let _editTeacherUid = null;
+function openEditTeacher(uid){
+  const t = teachers.find(x=>x.uid===uid);
+  if(!t) return;
+  _editTeacherUid = uid;
+  document.getElementById('edit-t-name').value = t.name||'';
+  document.getElementById('edit-t-role').value = t.role||'';
+  document.getElementById('edit-t-grade').value = t.grade||'';
+  document.getElementById('edit-t-cls').value = t.cls||'';
+  document.getElementById('edit-t-err').textContent='';
+  openModal('edit-teacher-modal');
+}
+async function saveEditTeacher(){
+  const name = document.getElementById('edit-t-name').value.trim();
+  const role = document.getElementById('edit-t-role').value.trim();
+  const grade= document.getElementById('edit-t-grade').value.trim();
+  const cls  = document.getElementById('edit-t-cls').value.trim();
+  const err  = document.getElementById('edit-t-err');
+  if(!name){ if(err) err.textContent='이름을 입력해주세요'; return; }
+  if(!_editTeacherUid){ if(err) err.textContent='세션 오류'; return; }
+  setLoading(true,'수정 중...');
+  try{
+    const data = await api({action:'editTeacher', uid:_editTeacherUid, name, role, grade, cls});
+    if(data.error){ if(err) err.textContent=data.error; return; }
+    teachers = data.teachers||[];
+    closeModal('edit-teacher-modal');
+    renderTeacherList();
+    showToast('수정 완료 ✓');
+  }catch(e){ if(err) err.textContent='연결 오류: '+e.message; }
+  finally{ setLoading(false); }
+}
+async function deleteTeacherFromModal(){
+  if(!_editTeacherUid) return;
+  if(!confirm('이 교사를 삭제하시겠습니까?')) return;
+  setLoading(true,'삭제 중...');
+  try{
+    const data = await api({action:'removeTeacher', uid:_editTeacherUid});
+    if(data.error){ showToast('오류: '+data.error); return; }
+    teachers = data.teachers||[];
+    closeModal('edit-teacher-modal');
+    renderTeacherList();
+    showToast('삭제 완료');
+  }catch(e){ showToast('연결 오류: '+e.message); }
+  finally{ setLoading(false); }
+}
+
+async function bulkDeleteTeachers(){
+  if(selectedTeacherUids.size===0) return;
+  if(!confirm(`선택한 ${selectedTeacherUids.size}명을 삭제하시겠습니까?`)) return;
+  const uids = [...selectedTeacherUids];
+  setLoading(true,`${uids.length}명 삭제 중...`);
+  try{
+    const data = await api({action:'bulkRemoveTeachers', uids:JSON.stringify(uids)});
+    if(data.error){ showToast('오류: '+data.error); return; }
+    teachers = data.teachers||[];
+    selectedTeacherUids.clear();
+    renderTeacherList();
+    showToast(`${uids.length}명 삭제 완료`);
+  }catch(e){ showToast('연결 오류: '+e.message); }
+  finally{ setLoading(false); }
+}
+
+// 샘플 양식 다운로드
+function downloadTeacherTemplate(){
+  if(typeof XLSX==='undefined'){ showToast('엑셀 라이브러리 로드 실패'); return; }
+  const ws = XLSX.utils.aoa_to_sheet([['이름','직분','담당학년','담당반'],['홍길동','교사','중1','1'],['김부장','부장','','']]);
+  ws['!cols']=[{wch:14},{wch:10},{wch:12},{wch:8}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '교사명단');
+  XLSX.writeFile(wb, (currentDept?.name||'')+'_교사명단_양식.xlsx');
+}
+
+// 현재 명단 다운로드 (고유코드 포함)
+function downloadTeacherList(){
+  if(typeof XLSX==='undefined'){ showToast('엑셀 라이브러리 로드 실패'); return; }
+  if(!teachers.length){ showToast('등록된 교사가 없습니다'); return; }
+  const header = ['이름','직분','담당학년','담당반','고유코드'];
+  const sorted = teachers.slice().sort((a,b)=>{
+    const r = String(a.role).localeCompare(String(b.role),'ko');
+    if(r!==0) return r;
+    return String(a.name).localeCompare(String(b.name),'ko');
+  });
+  const aoa = [header];
+  sorted.forEach(t=>aoa.push([t.name, t.role||'', t.grade||'', t.cls||'', t.uid||'']));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:14},{wch:10},{wch:12},{wch:8},{wch:20}];
+  // 고유코드 열 회색
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for(let r=0;r<=range.e.r;r++){
+    const addr = XLSX.utils.encode_cell({r, c:4});
+    if(ws[addr]) ws[addr].s = { fill:{fgColor:{rgb:r===0?'1A5276':'F0F0F0'}}, font:{color:{rgb:r===0?'FFFFFF':'999999'},bold:r===0}, alignment:{horizontal:'center'} };
+  }
+  for(let c=0;c<4;c++){
+    const addr = XLSX.utils.encode_cell({r:0, c});
+    if(ws[addr]) ws[addr].s = { fill:{fgColor:{rgb:'1A5276'}}, font:{color:{rgb:'FFFFFF'},bold:true}, alignment:{horizontal:'center'} };
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '교사명단');
+  const today = new Date();
+  const dstr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  XLSX.writeFile(wb, `${currentDept?.name||''}_교사명단_${dstr}.xlsx`);
+  showToast(`${teachers.length}명 명단 다운로드 완료`);
+}
+
+// 신규 등록 파싱
+function onTeacherExcelFile(event){
+  const file=event.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      parsedTeacherXlsx=[];
+      for(let i=1;i<rows.length;i++){
+        const name=String(rows[i][0]||'').trim();
+        if(!name) continue;
+        parsedTeacherXlsx.push({
+          name,
+          role:String(rows[i][1]||'').trim(),
+          grade:String(rows[i][2]||'').trim(),
+          cls:String(rows[i][3]||'').trim()
+        });
+      }
+      showTeacherPreview();
+    }catch(err){ showToast('파일 읽기 오류: '+err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function showTeacherPreview(){
+  const preview=document.getElementById('t-excel-preview');
+  const btn=document.getElementById('t-excel-upload-btn');
+  const plist=document.getElementById('t-preview-list');
+  if(!parsedTeacherXlsx.length){
+    preview.style.display='block';
+    plist.innerHTML='<div style="padding:12px;font-size:13px;color:var(--rd-fg)">데이터를 찾을 수 없습니다.</div>';
+    btn.style.display='none'; return;
+  }
+  document.getElementById('t-preview-count').textContent=`총 ${parsedTeacherXlsx.length}명`;
+  plist.innerHTML=parsedTeacherXlsx.map(t=>{
+    const meta=[t.role,t.grade,(t.cls?t.cls+'반':'')].filter(Boolean).join(' · ');
+    return `<div class="excel-preview-row"><span class="pr-name">${esc(t.name)}</span><span class="pr-grade">${esc(meta||'-')}</span></div>`;
+  }).join('');
+  preview.style.display='block';
+  btn.style.display='block'; btn.textContent=`${parsedTeacherXlsx.length}명 일괄 등록하기`;
+}
+async function uploadTeacherExcel(){
+  if(!parsedTeacherXlsx.length) return;
+  const CHUNK=40;
+  const chunks=[];
+  for(let i=0;i<parsedTeacherXlsx.length;i+=CHUNK) chunks.push(parsedTeacherXlsx.slice(i,i+CHUNK));
+  let totalAdded=0;
+  setLoading(true,`${parsedTeacherXlsx.length}명 등록 준비 중...`);
+  try{
+    for(let i=0;i<chunks.length;i++){
+      const done=Math.min((i+1)*CHUNK, parsedTeacherXlsx.length);
+      setLoading(true,`등록 중... (${done}/${parsedTeacherXlsx.length}명)`);
+      const data=await api({action:'bulkAddTeachers', teachers:JSON.stringify(chunks[i])});
+      if(data.error){ showToast('오류: '+data.error); if(data.teachers){teachers=data.teachers;renderTeacherList();} return; }
+      totalAdded += (data.added||[]).length;
+      if(data.teachers) teachers=data.teachers;
+    }
+    renderTeacherList();
+    showToast(`완료: ${totalAdded}명 등록`);
+    parsedTeacherXlsx=[];
+    document.getElementById('t-excel-preview').style.display='none';
+    document.getElementById('t-excel-upload-btn').style.display='none';
+    document.getElementById('t-excel-file').value='';
+  }catch(e){
+    showToast('연결 오류: '+e.message);
+    try{ const d=await api({action:'teachers'}); teachers=d.teachers||[]; renderTeacherList(); }catch(_){}
+  }
+  finally{ setLoading(false); }
+}
+
+// 수정용 파싱 (고유코드 필수)
+function onTeacherExcelEditFile(event){
+  const file=event.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      const head = (rows[0]||[]).map(c=>String(c).trim());
+      let idxUid = head.findIndex(h=>h==='고유코드');
+      if(idxUid<0) idxUid = 4;
+      const uidSet = new Set(teachers.map(t=>t.uid));
+      parsedTeacherEditXlsx=[];
+      for(let i=1;i<rows.length;i++){
+        const name=String(rows[i][0]||'').trim();
+        if(!name) continue;
+        const uid=String(rows[i][idxUid]||'').trim();
+        parsedTeacherEditXlsx.push({
+          name,
+          role:String(rows[i][1]||'').trim(),
+          grade:String(rows[i][2]||'').trim(),
+          cls:String(rows[i][3]||'').trim(),
+          uid,
+          matched: uid && uidSet.has(uid)
+        });
+      }
+      showTeacherEditPreview();
+    }catch(err){ showToast('파일 읽기 오류: '+err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function showTeacherEditPreview(){
+  const preview=document.getElementById('t-excel-edit-preview');
+  const btn=document.getElementById('t-excel-edit-btn');
+  const plist=document.getElementById('t-edit-preview-list');
+  if(!parsedTeacherEditXlsx.length){
+    preview.style.display='block';
+    plist.innerHTML='<div style="padding:12px;font-size:13px;color:var(--rd-fg)">데이터를 찾을 수 없습니다.</div>';
+    btn.style.display='none'; return;
+  }
+  const editCount=parsedTeacherEditXlsx.filter(t=>t.matched).length;
+  const noMatch=parsedTeacherEditXlsx.filter(t=>!t.matched).length;
+  document.getElementById('t-edit-preview-count').textContent=`총 ${parsedTeacherEditXlsx.length}명 (수정 ${editCount}명${noMatch?`, 코드없음 ${noMatch}명 제외`:''})`;
+  plist.innerHTML=parsedTeacherEditXlsx.map(t=>{
+    const meta=[t.role,t.grade,(t.cls?t.cls+'반':'')].filter(Boolean).join(' · ');
+    return `<div class="excel-preview-row ${t.matched?'':'dup'}"><span class="pr-name">${esc(t.name)}</span><span class="pr-grade">${esc(meta||'-')}${t.matched?' ✎':' ⚠코드없음'}</span></div>`;
+  }).join('');
+  preview.style.display='block';
+  if(editCount>0){ btn.style.display='block'; btn.textContent=`${editCount}명 정보 일괄 수정하기`; }
+  else{ btn.style.display='none'; showToast('수정할 수 있는 교사가 없습니다 (고유코드 확인)'); }
+}
+async function uploadTeacherExcelEdit(){
+  const toEdit=parsedTeacherEditXlsx.filter(t=>t.matched);
+  if(!toEdit.length) return;
+  const CHUNK=40;
+  const chunks=[];
+  for(let i=0;i<toEdit.length;i+=CHUNK) chunks.push(toEdit.slice(i,i+CHUNK));
+  let totalUpdated=0;
+  setLoading(true,`${toEdit.length}명 수정 준비 중...`);
+  try{
+    for(let i=0;i<chunks.length;i++){
+      const done=Math.min((i+1)*CHUNK, toEdit.length);
+      setLoading(true,`수정 중... (${done}/${toEdit.length}명)`);
+      const payload=chunks[i].map(t=>({uid:t.uid,name:t.name,role:t.role||'',grade:t.grade||'',cls:t.cls||''}));
+      const data=await api({action:'bulkEditTeachers', teachers:JSON.stringify(payload)});
+      if(data.error){ showToast('오류: '+data.error); if(data.teachers){teachers=data.teachers;renderTeacherList();} return; }
+      totalUpdated += (data.updated||[]).length;
+      if(data.teachers) teachers=data.teachers;
+    }
+    renderTeacherList();
+    showToast(`완료: ${totalUpdated}명 정보 수정됨`);
+    parsedTeacherEditXlsx=[];
+    document.getElementById('t-excel-edit-preview').style.display='none';
+    document.getElementById('t-excel-edit-btn').style.display='none';
+    document.getElementById('t-excel-edit-file').value='';
+  }catch(e){
+    showToast('연결 오류: '+e.message);
+    try{ const d=await api({action:'teachers'}); teachers=d.teachers||[]; renderTeacherList(); }catch(_){}
+  }
+  finally{ setLoading(false); }
 }
 </script>
 </body>
