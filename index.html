@@ -612,6 +612,11 @@ select, input, button { min-width: 0; box-sizing: border-box; }
     <button class="change-dept-btn" onclick="openTeacherAdmin()" style="background:#eaf2f8;color:#1a5276;border-color:#aed6f1;">👨‍🏫 교사 명단 관리하기</button>
   </div>
 
+  <div class="adm-sec" id="parent-admin-sec" style="display:none;">
+    <div class="adm-sec-ttl">학부모 관리</div>
+    <button class="change-dept-btn" onclick="openParentAdmin()" style="background:#fef9e7;color:#7d6608;border-color:#f7dc6f;">👪 학부모 명단 관리하기</button>
+  </div>
+
   <div class="adm-sec">
     <div class="adm-sec-ttl">등록된 학생 <span id="stu-count" style="font-weight:400;text-transform:none;letter-spacing:0"></span></div>
 
@@ -785,6 +790,84 @@ select, input, button { min-width: 0; box-sizing: border-box; }
   </div>
 </div>
 
+<!-- ════════════ 학부모 관리 화면 (영유아부) ════════════ -->
+<div id="s-parent" class="screen">
+  <div class="adm-hdr" style="background:#7d6608;">
+    <button class="back-btn" onclick="closeParentAdmin()">←</button>
+    <h2>👪 학부모 명단 관리</h2>
+  </div>
+
+  <!-- 개별 추가 -->
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">학부모 개별 추가</div>
+    <div class="card">
+      <div class="add-row">
+        <select class="gender-sel" id="new-p-gender" style="width:80px;flex:0 0 80px;">
+          <option value="">성별</option><option value="남">남</option><option value="여">여</option>
+        </select>
+        <input class="inp name-inp" id="new-p-name" type="text" placeholder="학부모 이름" onkeydown="if(event.key==='Enter')addParent()"/>
+      </div>
+      <div class="add-row" style="margin-top:8px;">
+        <input class="inp" id="new-p-child" type="text" placeholder="자녀 이름" style="flex:1;" onkeydown="if(event.key==='Enter')addParent()"/>
+        <button class="add-btn" onclick="addParent()">추가</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 엑셀 학부모 관리 -->
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">엑셀 학부모 관리</div>
+    <div class="card">
+      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--bdr);">
+        <div style="font-size:14px;font-weight:700;color:#7d6608;margin-bottom:6px;">① 현재 명단 다운로드</div>
+        <p class="excel-desc" style="margin-bottom:8px;">등록된 학부모 전체를 엑셀로 내려받아요. (고유코드 포함)</p>
+        <button class="excel-tpl-btn" style="width:100%;" onclick="downloadParentList()">📥 현재 학부모 명단 다운로드</button>
+      </div>
+      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--bdr);">
+        <div style="font-size:14px;font-weight:700;color:#7d6608;margin-bottom:6px;">② 신규 학부모 일괄 등록</div>
+        <p class="excel-desc" style="margin-bottom:8px;"><b>A열: 이름 / B열: 성별 / C열: 자녀이름</b> 형식으로 등록해요.</p>
+        <div class="excel-btns">
+          <label class="excel-select-btn" for="p-excel-file">📂 신규 등록 파일 선택</label>
+          <button class="excel-tpl-btn" onclick="downloadParentTemplate()">📋 샘플 양식</button>
+        </div>
+        <input type="file" id="p-excel-file" accept=".xlsx,.xls" style="display:none" onchange="onParentExcelFile(event)"/>
+        <div class="excel-preview" id="p-excel-preview">
+          <div class="excel-preview-hdr"><span id="p-preview-count">미리보기</span></div>
+          <div class="excel-preview-list" id="p-preview-list"></div>
+        </div>
+        <button class="excel-upload-btn" id="p-excel-upload-btn" onclick="uploadParentExcel()">일괄 등록하기</button>
+      </div>
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#7d6608;margin-bottom:6px;">③ 학부모 정보 일괄 수정</div>
+        <p class="excel-desc" style="margin-bottom:8px;">①에서 받은 명단을 고쳐서 올리면 <b>고유코드로 매칭해 수정만</b> 이루어져요.</p>
+        <label class="excel-select-btn" for="p-excel-edit-file" style="width:100%;box-sizing:border-box;">📝 수정 파일 선택</label>
+        <input type="file" id="p-excel-edit-file" accept=".xlsx,.xls" style="display:none" onchange="onParentExcelEditFile(event)"/>
+        <div class="excel-preview" id="p-excel-edit-preview">
+          <div class="excel-preview-hdr"><span id="p-edit-preview-count">미리보기</span><span style="font-weight:400">✎=수정 대상</span></div>
+          <div class="excel-preview-list" id="p-edit-preview-list"></div>
+        </div>
+        <button class="excel-upload-btn" id="p-excel-edit-btn" onclick="uploadParentExcelEdit()">일괄 수정하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 학부모 목록 -->
+  <div class="adm-sec">
+    <div class="adm-sec-ttl">등록된 학부모 <span id="parent-count" style="font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+    <div class="stu-ctrl-bar">
+      <input class="stu-search-inp" id="parent-search" type="text" placeholder="🔍 이름/자녀 검색..." oninput="renderParentList()"/>
+    </div>
+    <div class="stu-bulk-bar">
+      <label class="stu-all-wrap">
+        <input type="checkbox" id="parent-select-all" onchange="toggleParentSelectAll(this)"/>
+        <span>전체 선택</span>
+      </label>
+      <button class="stu-del-sel" id="parent-del-btn" onclick="bulkDeleteParents()" disabled>선택 삭제 (0명)</button>
+    </div>
+    <div id="parent-list"></div>
+  </div>
+</div>
+
 <!-- ════════════ 교육부 출석 통계 화면 ════════════ -->
 <div id="s-stats" class="screen">
   <div class="adm-hdr" style="background:#1a5276;">
@@ -932,6 +1015,12 @@ select, input, button { min-width: 0; box-sizing: border-box; }
         <span class="rpt-stat-val" id="rpt-f-attend">-</span>
         <span class="rpt-stat-unit">명</span>
         <button class="stat-edit-btn" onclick="editStat('f')" title="수정">✏️</button>
+      </div>
+      <div class="rpt-stat-row" id="rpt-parent-row" style="display:none;border-top:1px solid var(--bdr);">
+        <span class="rpt-stat-lbl">👪 학부모 출석</span>
+        <span class="rpt-stat-val" id="rpt-parent-attend">-</span>
+        <span class="rpt-stat-unit">명</span>
+        <button class="stat-edit-btn" onclick="editParentAttend()" title="수정">✏️</button>
       </div>
       <div class="rpt-stat-note" id="rpt-stat-note">오늘 출석체크 데이터 기준</div>
       <!-- 학년별 재적·출석 표 -->
@@ -1116,6 +1205,27 @@ select, input, button { min-width: 0; box-sizing: border-box; }
   </div>
 </div>
 
+<!-- 학부모 정보 수정 모달 -->
+<div class="overlay" id="edit-parent-modal">
+  <div class="modal">
+    <h3>✏️ 학부모 정보 수정</h3>
+    <div style="display:flex;flex-direction:column;gap:10px;margin:16px 0;">
+      <select class="gender-sel" id="edit-p-gender" style="width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);">
+        <option value="">성별 선택</option><option value="남">남</option><option value="여">여</option>
+      </select>
+      <input class="inp" id="edit-p-child" type="text" placeholder="자녀 이름"
+             style="width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);"/>
+      <input class="inp" id="edit-p-name" type="text" placeholder="학부모 이름"
+             style="width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);"
+             onkeydown="if(event.key==='Enter')saveEditParent()"/>
+    </div>
+    <div class="pw-err" id="edit-p-err"></div>
+    <button class="mbtn mbtn-p" onclick="saveEditParent()">저장</button>
+    <button class="mbtn mbtn-s" onclick="deleteParentFromModal()" style="color:var(--rd-fg);">삭제</button>
+    <button class="mbtn mbtn-s" onclick="closeModal('edit-parent-modal')">취소</button>
+  </div>
+</div>
+
 <!-- 부서 활성화/비활성화 관리 시트 -->
 <div class="dept-admin-overlay" id="dept-admin-overlay">
   <div class="dept-admin-sheet">
@@ -1157,6 +1267,11 @@ let bulkMode       = false;       // 일괄 출석 모드
 let bulkSelected   = new Set();   // 일괄 출석 선택된 학생 키
 let recEditMode    = false;       // 출석 기록 편집 모드
 let selectedRecKeys= new Set();   // 출석 편집 선택된 기록 키
+let _saveQueue     = [];          // 저장 대기열
+let _queueRunning  = false;       // 큐 처리 중 여부
+let _pendingCount  = 0;           // 저장 대기 중인 건수
+let attendParents  = [];          // 출석체크용 학부모 명단 (영유아부)
+const PARENT_GRADE = '학부모';    // 출석기록 학부모 구분자
 let stuFilterGrade = '';
 let selectedStuKeys= new Set();
 // ★ 보고자료 날짜 스피너
@@ -1353,9 +1468,14 @@ function selectDept(dept, showLoading=true){
 
   // ★ 부서 유형에 따라 학년/반 선택창 즉시 숨김/표시
   const isYear = dept.type === 'year';
-  document.getElementById('grade-sel').style.display = isYear ? 'none' : '';
+  const isParentDept = (dept.name === '영유아부');
+  document.getElementById('grade-sel').style.display = (isYear && !isParentDept) ? 'none' : '';
   const useCls = (dept.name !== '청년부');
-  document.getElementById('sel-label').textContent   = isYear ? (useCls ? '반 · 이름 선택' : '이름 선택') : '학년 · 반 · 이름 선택';
+  if(isParentDept){
+    document.getElementById('sel-label').textContent = '구분 · 이름 선택';
+  } else {
+    document.getElementById('sel-label').textContent = isYear ? (useCls ? '반 · 이름 선택' : '이름 선택') : '학년 · 반 · 이름 선택';
+  }
   const clsSelEl = document.getElementById('cls-sel');
   if(clsSelEl) clsSelEl.style.display = useCls ? '' : 'none';
 
@@ -1481,6 +1601,13 @@ async function fetchStudents(){
   const data=await api({action:'students'});
   if(data.error) throw new Error(data.error);
   students=data.students||[];
+  // 영유아부: 학부모 명단도 함께 로드 (출석체크용)
+  if(useParentAttend()){
+    try{ const pd=await api({action:'parents'}); attendParents=pd.parents||[]; }
+    catch(e){ attendParents=[]; }
+  } else {
+    attendParents=[];
+  }
   buildGradeFilter(); renderStudentList();
   // 일괄 출석 패널이 열려있으면 갱신
   if(typeof bulkMode!=='undefined' && bulkMode){ buildBulkGradeFilter(); renderBulkList(); }
@@ -1523,17 +1650,20 @@ function renderRecords(records, showTime){
       rightSide = `<span class="badge ${r.status==='출석'?'bp':'bl'}">${esc(r.status)}</span>`;
     }
     // 편집 모드: 저장 완료된 기록에 체크박스 표시
+    const metaTxt = (r.grade===PARENT_GRADE)
+      ? `👪 학부모${r.cls?' · 자녀:'+esc(r.cls):''}`
+      : `${esc(r.grade)}${(useClass()&&r.cls)?' · '+esc(r.cls)+'반':''}`;
     if(recEditMode && !r._pending){
       const key = r.name+'__'+r.grade;
       const checked = selectedRecKeys.has(key);
       return `<div class="rec-row rec-editable${checked?' rec-checked':''}" onclick="toggleRecSelect('${esc(key)}')">
         <label class="rec-check-wrap"><input type="checkbox" ${checked?'checked':''} style="width:20px;height:20px;accent-color:var(--rd-fg);pointer-events:none;"/></label>
-        <div class="rec-info"><div class="r-name">${esc(dispName(r))}</div><div class="r-meta">${esc(r.grade)}${(useClass()&&r.cls)?' · '+esc(r.cls)+'반':''}</div></div>
+        <div class="rec-info"><div class="r-name">${esc(dispName(r))}</div><div class="r-meta">${metaTxt}</div></div>
         <div class="rec-right">${rightSide}</div>
       </div>`;
     }
     return `<div class="rec-row${r._pending?' rec-pending':''}">
-      <div class="rec-info"><div class="r-name">${esc(dispName(r))}</div><div class="r-meta">${esc(r.grade)}${(useClass()&&r.cls)?' · '+esc(r.cls)+'반':''}</div></div>
+      <div class="rec-info"><div class="r-name">${esc(dispName(r))}</div><div class="r-meta">${metaTxt}</div></div>
       <div class="rec-right">${rightSide}</div>
     </div>`;
   }).join('');
@@ -1550,10 +1680,18 @@ function isDeptYearType(){
 function useClass(){
   return !!(currentDept && currentDept.name !== '청년부');
 }
+// 학부모 출석 사용 부서 (영유아부만)
+function useParentAttend(){
+  return !!(currentDept && currentDept.name === '영유아부');
+}
 
 // 이름 표시: 연도제 부서는 "이름(연도)", 학년제는 "이름"
 function dispName(student){
   const g = student.gender || '';
+  // 학부모 레코드는 이름만 (또는 이름/성별)
+  if (student.grade === PARENT_GRADE){
+    return g ? `${student.name}(${g})` : student.name;
+  }
   if (isDeptYearType() && student.grade) {
     return g ? `${student.name}(${student.grade}/${g})` : `${student.name}(${student.grade})`;
   }
@@ -1568,6 +1706,18 @@ function koreanSort(arr){
 // ── 학년 필터 ─────────────────────────────────────────────────
 function buildGradeFilter(){
   const gradeSel = document.getElementById('grade-sel');
+  // 영유아부: 출생연도 + '학부모' 선택 드롭다운 표시
+  if (useParentAttend()){
+    gradeSel.style.display = '';
+    const years=[...new Set(students.map(s=>s.grade))].sort((a,b)=>String(a).localeCompare(String(b),'ko',{numeric:true}));
+    const prev=gradeSel.value;
+    gradeSel.innerHTML='<option value="">전체</option>';
+    years.forEach(y=>{ const o=document.createElement('option'); o.value=y; o.textContent=y+'년생'; if(y===prev)o.selected=true; gradeSel.appendChild(o); });
+    // 학부모 옵션
+    const po=document.createElement('option'); po.value=PARENT_GRADE; po.textContent='👪 학부모'; if(prev===PARENT_GRADE)po.selected=true; gradeSel.appendChild(po);
+    onGradeChange();
+    return;
+  }
   if (isDeptYearType()){
     // 연도제 부서: 학년 필터는 숨김 (반 필터는 buildClsFilter가 useClass 기준으로 처리)
     gradeSel.style.display = 'none';
@@ -1594,21 +1744,46 @@ function onClsChange(){
 
 // 현재 학년/반 필터에 맞는 이름 목록 채우기
 function fillNameOptions(){
+  const sel = document.getElementById('name-sel');
+  const gradeVal = document.getElementById('grade-sel')?.value || '';
+
+  // 영유아부에서 '학부모' 선택 시 → 학부모 명단 표시
+  if(useParentAttend() && gradeVal === PARENT_GRADE){
+    const clsEl = document.getElementById('cls-sel'); if(clsEl) clsEl.style.display='none';
+    const prev = sel.value;
+    sel.innerHTML='<option value="">학부모 선택...</option>';
+    const sortedP = [...attendParents].sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+    sortedP.forEach(p=>{
+      const o=document.createElement('option');
+      o.value = 'P::'+p.uid;  // 학부모는 P:: 접두사로 구분
+      const g = p.gender ? '/'+p.gender : '';
+      const c = p.child ? ' · 자녀:'+p.child : '';
+      o.textContent = `${p.name}${g}${c}`;
+      if(o.value===prev) o.selected=true;
+      sel.appendChild(o);
+    });
+    updateSubBtn();
+    return;
+  }
+
   const grade = isDeptYearType() ? '' : document.getElementById('grade-sel').value;
   const cls   = useClass() ? (document.getElementById('cls-sel')?.value || '') : '';
+  // 영유아부는 학생 필터 시 출생연도(grade) 적용
+  const yearFilter = useParentAttend() ? gradeVal : '';
   let filtered = students.slice();
-  if(grade) filtered = filtered.filter(s=>s.grade===grade);
+  if(yearFilter) filtered = filtered.filter(s=>s.grade===yearFilter);
+  else if(grade) filtered = filtered.filter(s=>s.grade===grade);
   if(cls)   filtered = filtered.filter(s=>(s.cls||'')===cls);
   const sorted = koreanSort(filtered);
-  const sel = document.getElementById('name-sel');
-  const prev = sel.value;
-  sel.innerHTML='<option value="">이름 선택...</option>';
+  const sel2 = sel;
+  const prev = sel2.value;
+  sel2.innerHTML='<option value="">이름 선택...</option>';
   sorted.forEach(s=>{
     const o=document.createElement('option');
     o.value=s.name;
     o.textContent=dispName(s);
     if(s.name===prev) o.selected=true;
-    sel.appendChild(o);
+    sel2.appendChild(o);
   });
   updateSubBtn();
 }
@@ -1642,27 +1817,39 @@ function updateSubBtn(){
 // ══════════════════════════════════════════════════════════════
 // ★ 출석 제출 — 낙관적 UI + 백그라운드 순차 저장 큐
 // ══════════════════════════════════════════════════════════════
-let _saveQueue = [];       // 저장 대기열
-let _queueRunning = false; // 큐 처리 중 여부
-let _pendingCount = 0;     // 저장 대기 중인 건수 (화면 표시용)
 
 // 출석 버튼 클릭 → 즉시 화면 반영, 저장은 큐에 추가
 function doSubmit(){
-  const name = document.getElementById('name-sel').value;
-  const found = students.find(s=>s.name===name) || {};
-  const grade = found.grade || '';
-  const gender = found.gender || '';
-  const cls = found.cls || '';
-  if (!name) return;
+  const rawVal = document.getElementById('name-sel').value;
+  if (!rawVal) return;
+
+  let name, grade, gender, cls;
+  // 학부모 출석 (P::uid 형태)
+  if (rawVal.startsWith('P::')){
+    const uid = rawVal.slice(3);
+    const parent = attendParents.find(p=>p.uid===uid);
+    if(!parent){ showToast('학부모 정보를 찾을 수 없습니다'); return; }
+    name = parent.name;
+    grade = PARENT_GRADE;   // 학부모 구분자
+    gender = parent.gender || '';
+    cls = parent.child || '';  // 반 칸에 자녀 이름 저장 (구분/보고용)
+  } else {
+    const found = students.find(s=>s.name===rawVal) || {};
+    name = rawVal;
+    grade = found.grade || '';
+    gender = found.gender || '';
+    cls = found.cls || '';
+  }
 
   const mode = getAttendanceMode();
   const status = (mode === 'late') ? '지각' : '출석';
 
-  // 이미 화면(캐시)에 같은 학생이 있으면 중복 안내
+  // 이미 화면(캐시)에 같은 사람이 있으면 중복 안내
   const cached = getCache();
   const already = cached.some(r => r.name===name && r.grade===grade);
   if (already){
-    document.getElementById('dup-attend-name').textContent=`${dispName(found)} (${grade})`;
+    const dispN = (grade===PARENT_GRADE) ? `${name} (학부모)` : `${name} (${grade})`;
+    document.getElementById('dup-attend-name').textContent=dispN;
     openModal('dup-attend-modal');
     resetForm();
     return;
@@ -2574,6 +2761,9 @@ function checkPw(){
 }
 function goAdmin(){
   showScreen('s-admin'); window.scrollTo(0,0);
+  // 학부모 관리는 영유아부에서만 표시
+  const parentSec = document.getElementById('parent-admin-sec');
+  if(parentSec) parentSec.style.display = (currentDept?.name === '영유아부') ? '' : 'none';
   document.getElementById('s-name').value        = remoteSettings.appName||'';
   document.getElementById('s-color-txt').value   = remoteSettings.primaryColor||'#7D3C98';
   document.getElementById('s-color-pick').value  = remoteSettings.primaryColor||'#7D3C98';
@@ -3025,6 +3215,21 @@ function scheduleFetchRptStats(){
 // 출석 = 남(재적) + 여(재적) 자동 계산
 // 성별 미입력 출석자 수 (남+여로 안 잡히는 인원 보정용)
 let _attendUnknownGender = 0;
+let parentAttendEdited = false;
+
+// 학부모 출석 수기 수정
+function editParentAttend(){
+  const el = document.getElementById('rpt-parent-attend');
+  if(!el) return;
+  const cur = parseInt(el.textContent) || 0;
+  const input = prompt('학부모 출석 인원을 입력하세요', cur);
+  if(input === null) return;
+  const num = parseInt(input);
+  if(isNaN(num) || num < 0){ showToast('0 이상의 숫자를 입력해주세요'); return; }
+  el.textContent = num;
+  el.classList.add('edited');
+  parentAttendEdited = true;
+}
 
 function recalcAttend(){
   const m = parseInt(document.getElementById('rpt-m-attend')?.textContent) || 0;
@@ -3090,9 +3295,12 @@ async function fetchRptStats(){
     const data = await api({action:'recordsByDate', date:dateStr});
     if(data.error) throw new Error(data.error);
     const rec = data.records||[];
-    const maleCnt   = rec.filter(r=>String(r.gender||'').trim().startsWith('남')).length;
-    const femaleCnt = rec.filter(r=>String(r.gender||'').trim().startsWith('여')).length;
-    _attendUnknownGender = rec.length - maleCnt - femaleCnt;  // 성별 미입력자
+    // 학부모와 학생 분리 (영유아부)
+    const parentRecs = rec.filter(r=>r.grade===PARENT_GRADE);
+    const studentRecs = rec.filter(r=>r.grade!==PARENT_GRADE);
+    const maleCnt   = studentRecs.filter(r=>String(r.gender||'').trim().startsWith('남')).length;
+    const femaleCnt = studentRecs.filter(r=>String(r.gender||'').trim().startsWith('여')).length;
+    _attendUnknownGender = studentRecs.length - maleCnt - femaleCnt;  // 성별 미입력자
     const elR = document.getElementById('rpt-roster');
     const elM = document.getElementById('rpt-m-attend');
     const elF = document.getElementById('rpt-f-attend');
@@ -3101,7 +3309,16 @@ async function fetchRptStats(){
     if(elM && !statEdited.m){ elM.textContent = maleCnt;   elM.classList.remove('edited'); }
     if(elF && !statEdited.f){ elF.textContent = femaleCnt; elF.classList.remove('edited'); }
     recalcAttend();  // 출석 = 남+여+미입력+방문
-    renderGradeStats(rec);  // 학년별 재적·출석 표
+    renderGradeStats(studentRecs);  // 학년별 재적·출석 표 (학생만)
+    // 학부모 출석 (영유아부만)
+    const prow = document.getElementById('rpt-parent-row');
+    if(useParentAttend()){
+      if(prow) prow.style.display = 'flex';
+      const pel = document.getElementById('rpt-parent-attend');
+      if(pel && !parentAttendEdited){ pel.textContent = parentRecs.length; pel.classList.remove('edited'); }
+    } else {
+      if(prow) prow.style.display = 'none';
+    }
     if(note) note.textContent = `${rptY}년 ${rptM}월 ${rptD}일 출석 기준`;
   }catch(e){
     ['rpt-m-attend','rpt-f-attend'].forEach(id=>{ const el=document.getElementById(id); if(el && el.textContent==='…') el.textContent='-'; });
@@ -3134,7 +3351,8 @@ function editStat(type){
 async function resyncStats(){
   // 모든 수기 수정 해제
   statEdited = { roster:false, m:false, f:false };
-  ['rpt-roster','rpt-m-attend','rpt-f-attend'].forEach(id=>{
+  parentAttendEdited = false;
+  ['rpt-roster','rpt-m-attend','rpt-f-attend','rpt-parent-attend'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.classList.remove('edited');
   });
   const note = document.getElementById('rpt-stat-note');
@@ -3146,7 +3364,10 @@ async function resyncStats(){
     const dateStr = `${rptY}-${String(rptM).padStart(2,'0')}-${String(rptD).padStart(2,'0')}`;
     const data = await api({action:'recordsByDate', date:dateStr});
     if(data.error) throw new Error(data.error);
-    const rec = data.records||[];
+    const rec0 = data.records||[];
+    // 학부모/학생 분리
+    const parentRecs = rec0.filter(r=>r.grade===PARENT_GRADE);
+    const rec = rec0.filter(r=>r.grade!==PARENT_GRADE);
     // 성별 분류 (남/여 유연 매칭)
     const maleCnt   = rec.filter(r=>String(r.gender||'').trim().startsWith('남')).length;
     const femaleCnt = rec.filter(r=>String(r.gender||'').trim().startsWith('여')).length;
@@ -3160,6 +3381,13 @@ async function resyncStats(){
     if(elF){ elF.textContent = femaleCnt; elF.classList.remove('edited'); }
     recalcAttend();  // 출석 = 남+여+미입력+방문
     renderGradeStats(rec);
+    // 학부모 출석 동기화
+    const prow = document.getElementById('rpt-parent-row');
+    const pel = document.getElementById('rpt-parent-attend');
+    if(useParentAttend()){
+      if(prow) prow.style.display='flex';
+      if(pel){ pel.textContent = parentRecs.length; pel.classList.remove('edited'); }
+    } else if(prow){ prow.style.display='none'; }
     // 남+여 합이 실제 출석과 다르면 (성별 미입력자 존재) 안내
     if(_attendUnknownGender > 0){
       if(note) note.textContent = `동기화 완료 · 출석 ${rec.length}명 (성별 미입력 ${_attendUnknownGender}명 포함)`;
@@ -3180,9 +3408,13 @@ function initRptStats(){
   // 수기 수정 상태 초기화
   statEdited = { roster:false, m:false, f:false };
   _attendUnknownGender = 0;
-  ['rpt-roster','rpt-m-attend','rpt-f-attend'].forEach(id=>{
+  parentAttendEdited = false;
+  ['rpt-roster','rpt-m-attend','rpt-f-attend','rpt-parent-attend'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.classList.remove('edited');
   });
+  // 학부모 행 표시 여부 (영유아부만)
+  const prow = document.getElementById('rpt-parent-row');
+  if(prow) prow.style.display = useParentAttend() ? 'flex' : 'none';
   // 재적: 등록 학생 수 즉시 표시
   const el_roster = document.getElementById('rpt-roster');
   if(el_roster) el_roster.textContent = students.length;
@@ -3487,7 +3719,9 @@ function collectReportData(){
     events:      getEvents(),
     suggestions: getSuggestions(),
     gradeStats:  _lastGradeStats,
-    isYearDept:  isDeptYearType()
+    isYearDept:  isDeptYearType(),
+    isParentDept: useParentAttend(),
+    parentAttend: document.getElementById('rpt-parent-attend')?.textContent||'0'
   };
 }
 
@@ -3879,6 +4113,11 @@ function buildReportHTML(data){
       <td style="${tdBase}font-size:18px;font-weight:700;text-align:center;">${visitF}</td>
     </tr>
   </table>`;
+
+  // 학부모 출석 (영유아부)
+  if(data.isParentDept){
+    h += `<div style="font-size:14px;margin:6px 0 8px;${S}"><b>👪 학부모 출석: ${data.parentAttend||0}명</b></div>`;
+  }
 
   // 학년별 재적·출석
   if(data.gradeStats && data.gradeStats.rows && data.gradeStats.rows.length){
@@ -4631,6 +4870,338 @@ async function uploadTeacherExcelEdit(){
   }catch(e){
     showToast('연결 오류: '+e.message);
     try{ const d=await api({action:'teachers'}); teachers=d.teachers||[]; renderTeacherList(); }catch(_){}
+  }
+  finally{ setLoading(false); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// ★ 학부모 명단 관리 (영유아부 전용)
+// ══════════════════════════════════════════════════════════════
+let parents = [];
+let selectedParentUids = new Set();
+let parsedParentXlsx = [];
+let parsedParentEditXlsx = [];
+
+function openParentAdmin(){
+  showScreen('s-parent');
+  window.scrollTo(0,0);
+  fetchParents();
+}
+function closeParentAdmin(){
+  showScreen('s-admin');
+  window.scrollTo(0,0);
+}
+
+async function fetchParents(){
+  setLoading(true,'학부모 명단 불러오는 중...');
+  try{
+    const data = await api({action:'parents'});
+    if(data.error) throw new Error(data.error);
+    parents = data.parents || [];
+    selectedParentUids.clear();
+    renderParentList();
+  }catch(e){ showToast('오류: '+e.message); }
+  finally{ setLoading(false); }
+}
+
+function renderParentList(){
+  const el = document.getElementById('parent-list');
+  const cnt = document.getElementById('parent-count');
+  if(cnt) cnt.textContent = parents.length ? `(${parents.length}명)` : '';
+  if(!el) return;
+  const q = (document.getElementById('parent-search')?.value || '').trim().toLowerCase();
+  let list = parents.slice();
+  if(q) list = list.filter(p=>p.name.toLowerCase().includes(q) || (p.child||'').toLowerCase().includes(q));
+  list.sort((a,b)=>String(a.name).localeCompare(String(b.name),'ko'));
+  if(!list.length){ el.innerHTML='<div class="empty-msg" style="padding:20px;">등록된 학부모가 없습니다</div>'; updateParentDelBtn(); return; }
+  el.innerHTML = list.map(p=>{
+    const checked = selectedParentUids.has(p.uid);
+    const meta = [(p.gender?p.gender:''), (p.child?'자녀: '+p.child:'')].filter(Boolean).join(' · ');
+    return `<div class="stu-row">
+      <label class="stu-check-wrap"><input type="checkbox" ${checked?'checked':''} onchange="toggleParentSelect('${esc(p.uid)}')"/></label>
+      <div class="stu-info" onclick="openEditParent('${esc(p.uid)}')">
+        <div class="stu-name">${esc(p.name)}</div>
+        <span class="stu-grade">${esc(meta||'-')}</span>
+      </div>
+      <button class="edit-btn" onclick="openEditParent('${esc(p.uid)}')">✏️</button>
+    </div>`;
+  }).join('');
+  updateParentDelBtn();
+}
+
+function toggleParentSelect(uid){
+  if(selectedParentUids.has(uid)) selectedParentUids.delete(uid);
+  else selectedParentUids.add(uid);
+  updateParentDelBtn();
+  const all = document.getElementById('parent-select-all');
+  if(all) all.checked = parents.length>0 && selectedParentUids.size===parents.length;
+}
+function toggleParentSelectAll(cb){
+  selectedParentUids.clear();
+  if(cb.checked) parents.forEach(p=>selectedParentUids.add(p.uid));
+  renderParentList();
+}
+function updateParentDelBtn(){
+  const btn = document.getElementById('parent-del-btn');
+  if(!btn) return;
+  const n = selectedParentUids.size;
+  btn.disabled = n===0;
+  btn.textContent = `선택 삭제 (${n}명)`;
+}
+
+async function addParent(){
+  const name = document.getElementById('new-p-name').value.trim();
+  const gender = document.getElementById('new-p-gender').value;
+  const child = document.getElementById('new-p-child').value.trim();
+  if(!name){ showToast('이름을 입력해주세요'); return; }
+  setLoading(true,'추가 중...');
+  try{
+    const data = await api({action:'addParent', name, gender, child});
+    if(data.duplicate){ showToast('이미 동일한 학부모가 있습니다'); return; }
+    if(data.error){ showToast('오류: '+data.error); return; }
+    parents = data.parents||[];
+    document.getElementById('new-p-name').value='';
+    document.getElementById('new-p-gender').value='';
+    document.getElementById('new-p-child').value='';
+    renderParentList();
+    showToast(`${name} 추가 완료 ✓`);
+  }catch(e){ showToast('연결 오류: '+e.message); }
+  finally{ setLoading(false); }
+}
+
+let _editParentUid = null;
+function openEditParent(uid){
+  const p = parents.find(x=>x.uid===uid);
+  if(!p) return;
+  _editParentUid = uid;
+  document.getElementById('edit-p-name').value = p.name||'';
+  document.getElementById('edit-p-gender').value = p.gender||'';
+  document.getElementById('edit-p-child').value = p.child||'';
+  document.getElementById('edit-p-err').textContent='';
+  openModal('edit-parent-modal');
+}
+async function saveEditParent(){
+  const name = document.getElementById('edit-p-name').value.trim();
+  const gender = document.getElementById('edit-p-gender').value;
+  const child = document.getElementById('edit-p-child').value.trim();
+  const err = document.getElementById('edit-p-err');
+  if(!name){ if(err) err.textContent='이름을 입력해주세요'; return; }
+  if(!_editParentUid){ if(err) err.textContent='세션 오류'; return; }
+  setLoading(true,'수정 중...');
+  try{
+    const data = await api({action:'editParent', uid:_editParentUid, name, gender, child});
+    if(data.error){ if(err) err.textContent=data.error; return; }
+    parents = data.parents||[];
+    closeModal('edit-parent-modal');
+    renderParentList();
+    showToast('수정 완료 ✓');
+  }catch(e){ if(err) err.textContent='연결 오류: '+e.message; }
+  finally{ setLoading(false); }
+}
+async function deleteParentFromModal(){
+  if(!_editParentUid) return;
+  if(!confirm('이 학부모를 삭제하시겠습니까?')) return;
+  setLoading(true,'삭제 중...');
+  try{
+    const data = await api({action:'removeParent', uid:_editParentUid});
+    if(data.error){ showToast('오류: '+data.error); return; }
+    parents = data.parents||[];
+    closeModal('edit-parent-modal');
+    renderParentList();
+    showToast('삭제 완료');
+  }catch(e){ showToast('연결 오류: '+e.message); }
+  finally{ setLoading(false); }
+}
+
+async function bulkDeleteParents(){
+  if(selectedParentUids.size===0) return;
+  if(!confirm(`선택한 ${selectedParentUids.size}명을 삭제하시겠습니까?`)) return;
+  const uids = [...selectedParentUids];
+  setLoading(true,`${uids.length}명 삭제 중...`);
+  try{
+    const data = await api({action:'bulkRemoveParents', uids:JSON.stringify(uids)});
+    if(data.error){ showToast('오류: '+data.error); return; }
+    parents = data.parents||[];
+    selectedParentUids.clear();
+    renderParentList();
+    showToast(`${uids.length}명 삭제 완료`);
+  }catch(e){ showToast('연결 오류: '+e.message); }
+  finally{ setLoading(false); }
+}
+
+function downloadParentTemplate(){
+  if(typeof XLSX==='undefined'){ showToast('엑셀 라이브러리 로드 실패'); return; }
+  const ws = XLSX.utils.aoa_to_sheet([['이름','성별','자녀이름'],['홍길동','남','홍아기'],['김영희','여','김아기']]);
+  ws['!cols']=[{wch:14},{wch:8},{wch:14}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '학부모명단');
+  XLSX.writeFile(wb, (currentDept?.name||'')+'_학부모명단_양식.xlsx');
+}
+
+function downloadParentList(){
+  if(typeof XLSX==='undefined'){ showToast('엑셀 라이브러리 로드 실패'); return; }
+  if(!parents.length){ showToast('등록된 학부모가 없습니다'); return; }
+  const header = ['이름','성별','자녀이름','고유코드'];
+  const sorted = parents.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'ko'));
+  const aoa = [header];
+  sorted.forEach(p=>aoa.push([p.name, p.gender||'', p.child||'', p.uid||'']));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:14},{wch:8},{wch:14},{wch:20}];
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for(let r=0;r<=range.e.r;r++){
+    const addr = XLSX.utils.encode_cell({r, c:3});
+    if(ws[addr]) ws[addr].s = { fill:{fgColor:{rgb:r===0?'7D6608':'F0F0F0'}}, font:{color:{rgb:r===0?'FFFFFF':'999999'},bold:r===0}, alignment:{horizontal:'center'} };
+  }
+  for(let c=0;c<3;c++){
+    const addr = XLSX.utils.encode_cell({r:0, c});
+    if(ws[addr]) ws[addr].s = { fill:{fgColor:{rgb:'7D6608'}}, font:{color:{rgb:'FFFFFF'},bold:true}, alignment:{horizontal:'center'} };
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '학부모명단');
+  const today = new Date();
+  const dstr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  XLSX.writeFile(wb, `${currentDept?.name||''}_학부모명단_${dstr}.xlsx`);
+  showToast(`${parents.length}명 명단 다운로드 완료`);
+}
+
+function onParentExcelFile(event){
+  const file=event.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      parsedParentXlsx=[];
+      for(let i=1;i<rows.length;i++){
+        const name=String(rows[i][0]||'').trim();
+        if(!name) continue;
+        const rawG=String(rows[i][1]||'').trim();
+        const gender = rawG.startsWith('남')?'남':rawG.startsWith('여')?'여':'';
+        parsedParentXlsx.push({ name, gender, child:String(rows[i][2]||'').trim() });
+      }
+      showParentPreview();
+    }catch(err){ showToast('파일 읽기 오류: '+err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function showParentPreview(){
+  const preview=document.getElementById('p-excel-preview');
+  const btn=document.getElementById('p-excel-upload-btn');
+  const plist=document.getElementById('p-preview-list');
+  if(!parsedParentXlsx.length){
+    preview.style.display='block';
+    plist.innerHTML='<div style="padding:12px;font-size:13px;color:var(--rd-fg)">데이터를 찾을 수 없습니다.</div>';
+    btn.style.display='none'; return;
+  }
+  document.getElementById('p-preview-count').textContent=`총 ${parsedParentXlsx.length}명`;
+  plist.innerHTML=parsedParentXlsx.map(p=>{
+    const meta=[p.gender,(p.child?'자녀: '+p.child:'')].filter(Boolean).join(' · ');
+    return `<div class="excel-preview-row"><span class="pr-name">${esc(p.name)}</span><span class="pr-grade">${esc(meta||'-')}</span></div>`;
+  }).join('');
+  preview.style.display='block';
+  btn.style.display='block'; btn.textContent=`${parsedParentXlsx.length}명 일괄 등록하기`;
+}
+async function uploadParentExcel(){
+  if(!parsedParentXlsx.length) return;
+  const CHUNK=40;
+  const chunks=[];
+  for(let i=0;i<parsedParentXlsx.length;i+=CHUNK) chunks.push(parsedParentXlsx.slice(i,i+CHUNK));
+  let totalAdded=0;
+  setLoading(true,`${parsedParentXlsx.length}명 등록 준비 중...`);
+  try{
+    for(let i=0;i<chunks.length;i++){
+      const done=Math.min((i+1)*CHUNK, parsedParentXlsx.length);
+      setLoading(true,`등록 중... (${done}/${parsedParentXlsx.length}명)`);
+      const data=await api({action:'bulkAddParents', parents:JSON.stringify(chunks[i])});
+      if(data.error){ showToast('오류: '+data.error); if(data.parents){parents=data.parents;renderParentList();} return; }
+      totalAdded += (data.added||[]).length;
+      if(data.parents) parents=data.parents;
+    }
+    renderParentList();
+    showToast(`완료: ${totalAdded}명 등록`);
+    parsedParentXlsx=[];
+    document.getElementById('p-excel-preview').style.display='none';
+    document.getElementById('p-excel-upload-btn').style.display='none';
+    document.getElementById('p-excel-file').value='';
+  }catch(e){
+    showToast('연결 오류: '+e.message);
+    try{ const d=await api({action:'parents'}); parents=d.parents||[]; renderParentList(); }catch(_){}
+  }
+  finally{ setLoading(false); }
+}
+
+function onParentExcelEditFile(event){
+  const file=event.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      const head = (rows[0]||[]).map(c=>String(c).trim());
+      let idxUid = head.findIndex(h=>h==='고유코드');
+      if(idxUid<0) idxUid = 3;
+      const uidSet = new Set(parents.map(p=>p.uid));
+      parsedParentEditXlsx=[];
+      for(let i=1;i<rows.length;i++){
+        const name=String(rows[i][0]||'').trim();
+        if(!name) continue;
+        const uid=String(rows[i][idxUid]||'').trim();
+        const rawG=String(rows[i][1]||'').trim();
+        const gender = rawG.startsWith('남')?'남':rawG.startsWith('여')?'여':'';
+        parsedParentEditXlsx.push({ name, gender, child:String(rows[i][2]||'').trim(), uid, matched: uid && uidSet.has(uid) });
+      }
+      showParentEditPreview();
+    }catch(err){ showToast('파일 읽기 오류: '+err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function showParentEditPreview(){
+  const preview=document.getElementById('p-excel-edit-preview');
+  const btn=document.getElementById('p-excel-edit-btn');
+  const plist=document.getElementById('p-edit-preview-list');
+  if(!parsedParentEditXlsx.length){
+    preview.style.display='block';
+    plist.innerHTML='<div style="padding:12px;font-size:13px;color:var(--rd-fg)">데이터를 찾을 수 없습니다.</div>';
+    btn.style.display='none'; return;
+  }
+  const editCount=parsedParentEditXlsx.filter(p=>p.matched).length;
+  const noMatch=parsedParentEditXlsx.filter(p=>!p.matched).length;
+  document.getElementById('p-edit-preview-count').textContent=`총 ${parsedParentEditXlsx.length}명 (수정 ${editCount}명${noMatch?`, 코드없음 ${noMatch}명 제외`:''})`;
+  plist.innerHTML=parsedParentEditXlsx.map(p=>{
+    const meta=[p.gender,(p.child?'자녀: '+p.child:'')].filter(Boolean).join(' · ');
+    return `<div class="excel-preview-row ${p.matched?'':'dup'}"><span class="pr-name">${esc(p.name)}</span><span class="pr-grade">${esc(meta||'-')}${p.matched?' ✎':' ⚠코드없음'}</span></div>`;
+  }).join('');
+  preview.style.display='block';
+  if(editCount>0){ btn.style.display='block'; btn.textContent=`${editCount}명 정보 일괄 수정하기`; }
+  else{ btn.style.display='none'; showToast('수정할 수 있는 학부모가 없습니다 (고유코드 확인)'); }
+}
+async function uploadParentExcelEdit(){
+  const toEdit=parsedParentEditXlsx.filter(p=>p.matched);
+  if(!toEdit.length) return;
+  const CHUNK=40;
+  const chunks=[];
+  for(let i=0;i<toEdit.length;i+=CHUNK) chunks.push(toEdit.slice(i,i+CHUNK));
+  let totalUpdated=0;
+  setLoading(true,`${toEdit.length}명 수정 준비 중...`);
+  try{
+    for(let i=0;i<chunks.length;i++){
+      const done=Math.min((i+1)*CHUNK, toEdit.length);
+      setLoading(true,`수정 중... (${done}/${toEdit.length}명)`);
+      const payload=chunks[i].map(p=>({uid:p.uid,name:p.name,gender:p.gender||'',child:p.child||''}));
+      const data=await api({action:'bulkEditParents', parents:JSON.stringify(payload)});
+      if(data.error){ showToast('오류: '+data.error); if(data.parents){parents=data.parents;renderParentList();} return; }
+      totalUpdated += (data.updated||[]).length;
+      if(data.parents) parents=data.parents;
+    }
+    renderParentList();
+    showToast(`완료: ${totalUpdated}명 정보 수정됨`);
+    parsedParentEditXlsx=[];
+    document.getElementById('p-excel-edit-preview').style.display='none';
+    document.getElementById('p-excel-edit-btn').style.display='none';
+    document.getElementById('p-excel-edit-file').value='';
+  }catch(e){
+    showToast('연결 오류: '+e.message);
+    try{ const d=await api({action:'parents'}); parents=d.parents||[]; renderParentList(); }catch(_){}
   }
   finally{ setLoading(false); }
 }
