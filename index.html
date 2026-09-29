@@ -513,13 +513,14 @@ select, input, button { min-width: 0; box-sizing: border-box; }
 
   <!-- 스캔 테스트 모달 -->
   <div class="overlay" id="scan-test-modal">
-    <div class="modal" style="max-width:340px;width:88%;">
+    <div class="modal" style="max-width:360px;width:88%;">
       <h3>🧪 스캔 테스트</h3>
-      <div class="mbody" style="font-size:13px;">학생의 고유코드를 입력하고 확인을 누르면<br>리더기로 스캔한 것과 동일하게 처리됩니다.</div>
+      <div class="mbody" style="font-size:13px;">고유코드를 입력하고 아래 버튼을 누르면<br>실제 리더기 스캔을 그대로 재현합니다.</div>
       <input class="inp" id="scan-test-input" type="text" placeholder="고유코드 입력 (예: T...)"
-             style="width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);margin:14px 0;"
+             style="width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);margin:14px 0 6px;"
              onkeydown="if(event.key==='Enter')runScanTest()"/>
-      <button class="mbtn mbtn-p" onclick="runScanTest()">스캔 실행</button>
+      <button class="mbtn mbtn-p" onclick="simulateReaderScan()" style="background:var(--pr);">📡 리더기 스캔 재현 (실제 경로 테스트)</button>
+      <button class="mbtn mbtn-s" onclick="runScanTest()" style="font-size:13px;">직접 출석 처리 (간단 테스트)</button>
       <button class="mbtn mbtn-s" onclick="closeModal('scan-test-modal')">닫기</button>
     </div>
   </div>
@@ -2070,6 +2071,30 @@ function runScanTest(){
   closeModal('scan-test-modal');
   // 실제 리더기 스캔과 100% 동일한 경로로 처리
   processUidScan(uid, false);
+}
+
+// 리더기 스캔을 실제로 재현 — 빠른 키다운 이벤트 + 엔터를 발생시켜 전역 리스너 경로 통과
+function simulateReaderScan(){
+  const uid = (document.getElementById('scan-test-input')?.value || '').trim();
+  if(!uid){ showToast('고유코드를 입력해주세요'); return; }
+  // 모달을 먼저 닫고 (리더기 스캔은 메인 화면에서 일어나므로), 포커스도 해제
+  closeModal('scan-test-modal');
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  showToast('📡 리더기 스캔 재현 중...');
+  // 약간의 지연 후 리더기처럼 빠르게 키 입력 (모달 닫힘 반영 대기)
+  setTimeout(()=>{
+    const chars = uid.split('');
+    // 각 문자를 10ms 간격으로 빠르게 (리더기 속도) → keydown 이벤트 발생
+    chars.forEach((ch, i)=>{
+      setTimeout(()=>{
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true }));
+      }, i * 10);
+    });
+    // 마지막에 엔터
+    setTimeout(()=>{
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    }, chars.length * 10 + 10);
+  }, 300);
 }
 
 // ── ★ 전역 스캔 감지 (버튼 없이 스캔만으로 출석) ──────────────
@@ -4762,19 +4787,19 @@ function renderStatTable(){
     html += `<td class="stat-sum-col">${rowSum}</td></tr>`;
   });
 
-  // 평균 행
+  // 평균 행 (반올림 정수 표시)
   html += '<tr class="stat-avg-row"><th>평균</th>';
   let avgRowSum = 0; let avgRowCnt = 0;
   STAT_DEPT_ORDER.forEach(dn=>{
     if(deptCounts[dn]>0){
       const avg = deptTotals[dn]/deptCounts[dn];
       avgRowSum += avg; avgRowCnt++;
-      html += `<td>${avg.toFixed(1)}</td>`;
+      html += `<td>${Math.round(avg)}</td>`;
     } else {
       html += `<td style="color:#ccc;">-</td>`;
     }
   });
-  html += `<td class="stat-sum-col">${avgRowCnt>0?avgRowSum.toFixed(1):'-'}</td></tr>`;
+  html += `<td class="stat-sum-col">${avgRowCnt>0?Math.round(avgRowSum):'-'}</td></tr>`;
   html += '</tbody></table>';
   wrap.innerHTML = html;
 }
@@ -4816,8 +4841,11 @@ function downloadStatsExcel(){
   headCells.push({ v:'합계', kind:'sumHead' });
   rowsMeta.push({ cells:headCells, isSep:false });
 
-  // 날짜 행
+  // 날짜 행 (합계 열에 SUM 수식)
   let prevMonth = null;
+  const firstDeptColIdx = 1;                     // 첫 부서 열 인덱스 (0=날짜)
+  const lastDeptColIdx = STAT_DEPT_ORDER.length; // 마지막 부서 열 인덱스
+  const sumColIdx = STAT_DEPT_ORDER.length + 1;  // 합계 열 인덱스
   dates.forEach(d=>{
     const parts = d.split('-');
     const curMonth = +parts[1];
@@ -4830,18 +4858,19 @@ function downloadStatsExcel(){
       if(val != null){ rowSum += val; deptTotals[dn]+=val; deptCounts[dn]++; cells.push({ v:val, t:'n', kind:'cell' }); }
       else cells.push({ v:'', kind:'cell' });
     });
-    cells.push({ v:rowSum, t:'n', kind:'sumCell' });
+    // 합계 셀: SUM 수식 (엑셀 행번호는 나중에 채움 → 플래그로 표시)
+    cells.push({ v:rowSum, t:'n', kind:'sumCell', formula:'rowSum' });
     rowsMeta.push({ cells, isSep });
   });
 
-  // 평균 행
+  // 평균 행 (각 부서 열에 AVERAGE, 합계 열에 SUM 수식) — 데이터 유무와 무관하게 항상 수식
   const avgCells = [{ v:'평균', kind:'avg' }];
   let avgRowSum = 0;
   STAT_DEPT_ORDER.forEach(dn=>{
-    if(deptCounts[dn]>0){ const a=deptTotals[dn]/deptCounts[dn]; avgRowSum+=a; avgCells.push({ v:Number(a.toFixed(1)), t:'n', kind:'avg' }); }
-    else avgCells.push({ v:'', kind:'avg' });
+    if(deptCounts[dn]>0){ const a=deptTotals[dn]/deptCounts[dn]; avgRowSum+=a; avgCells.push({ v:Math.round(a), t:'n', kind:'avg', formula:'colAvg' }); }
+    else { avgCells.push({ v:'', t:'n', kind:'avg', formula:'colAvg' }); }  // 데이터 없어도 수식은 넣음 (나중에 값 채우면 자동 계산)
   });
-  avgCells.push({ v:Number(avgRowSum.toFixed(1)), t:'n', kind:'avg' });
+  avgCells.push({ v:Math.round(avgRowSum), t:'n', kind:'avg', formula:'avgTotal' });
   rowsMeta.push({ cells:avgCells, isSep:true });  // 평균 행 위에도 굵은 선
 
   const totalRows = rowsMeta.length;
@@ -4861,6 +4890,9 @@ function downloadStatsExcel(){
 
   // 시트 생성
   const ws = XLSX.utils.aoa_to_sheet(rowsMeta.map(r=>r.cells.map(c=>c.v)));
+  const dataFirstRow = 1;                 // 엑셀 0-index: 헤더가 0행 → 날짜 데이터는 1행부터
+  const dataLastRow = rowsMeta.length - 2; // 평균 행 직전까지가 날짜 데이터 (마지막 행=평균)
+  const avgRowIdx = rowsMeta.length - 1;   // 평균 행 인덱스
   rowsMeta.forEach((r,ri)=>{
     r.cells.forEach((c,ci)=>{
       const addr = XLSX.utils.encode_cell({r:ri, c:ci});
@@ -4871,6 +4903,23 @@ function downloadStatsExcel(){
         border: mkBorder(ri, ci, r.isSep, totalRows, totalCols)
       });
       if(c.t) ws[addr].t = c.t;
+      // ── 수식 적용 ──
+      if(c.formula === 'rowSum'){
+        // 날짜 행 합계 = 그 행의 부서 열들 SUM
+        const c1 = XLSX.utils.encode_cell({r:ri, c:firstDeptColIdx});
+        const c2 = XLSX.utils.encode_cell({r:ri, c:lastDeptColIdx});
+        ws[addr].f = `SUM(${c1}:${c2})`;
+      } else if(c.formula === 'colAvg' && dataLastRow >= dataFirstRow){
+        // 평균 행 부서 열 = 반올림 정수, 공백/에러 시 0
+        const r1 = XLSX.utils.encode_cell({r:dataFirstRow, c:ci});
+        const r2 = XLSX.utils.encode_cell({r:dataLastRow, c:ci});
+        ws[addr].f = `IFERROR(ROUNDUP(AVERAGE(${r1}:${r2}),0),0)`;
+      } else if(c.formula === 'avgTotal'){
+        // 평균 행 합계 = 평균 행의 부서 열들 SUM, 에러 시 0
+        const c1 = XLSX.utils.encode_cell({r:avgRowIdx, c:firstDeptColIdx});
+        const c2 = XLSX.utils.encode_cell({r:avgRowIdx, c:lastDeptColIdx});
+        ws[addr].f = `IFERROR(SUM(${c1}:${c2}),0)`;
+      }
     });
   });
 
