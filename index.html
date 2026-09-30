@@ -9,7 +9,6 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 </head>
 <body>
 
@@ -498,33 +497,6 @@ select, input, button { min-width: 0; box-sizing: border-box; }
     </button>
   </div>
 
-  <!-- 청년부: 공용 기기 스캔 출석 진입 -->
-  <div class="card" id="qr-scan-entry" style="display:none;">
-    <div style="display:flex;align-items:center;gap:8px;padding:10px 0;">
-      <span style="font-size:22px;">📡</span>
-      <div>
-        <div style="font-size:14px;font-weight:700;color:var(--pr-dk);">스캔 대기 중</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;">이 화면에서 QR/바코드를 리더기로 태그하면 자동으로 출석됩니다.</div>
-      </div>
-    </div>
-    <button class="change-dept-btn" onclick="openVisitorAdd()" style="margin-bottom:8px;margin-top:6px;background:#e8f8f0;color:#1a7a41;border-color:#a9dfbf;">➕ 방문자 출석 등록</button>
-    <button onclick="openScanTest()" style="width:100%;padding:8px;background:none;color:var(--muted);border:1px dashed var(--bdr);border-radius:8px;font-size:12px;cursor:pointer;">🧪 스캔 테스트 (리더기 없이 확인)</button>
-  </div>
-
-  <!-- 스캔 테스트 모달 -->
-  <div class="overlay" id="scan-test-modal">
-    <div class="modal" style="max-width:360px;width:88%;">
-      <h3>🧪 스캔 테스트</h3>
-      <div class="mbody" style="font-size:13px;">고유코드를 입력하고 아래 버튼을 누르면<br>실제 리더기 스캔을 그대로 재현합니다.</div>
-      <input class="inp" id="scan-test-input" type="text" placeholder="고유코드 입력 (예: T...)"
-             style="width:100%;padding:11px;font-size:15px;border:1.5px solid var(--bdr);border-radius:var(--r);margin:14px 0 6px;"
-             onkeydown="if(event.key==='Enter')runScanTest()"/>
-      <button class="mbtn mbtn-p" onclick="simulateReaderScan()" style="background:var(--pr);">📡 리더기 스캔 재현 (실제 경로 테스트)</button>
-      <button class="mbtn mbtn-s" onclick="runScanTest()" style="font-size:13px;">직접 출석 처리 (간단 테스트)</button>
-      <button class="mbtn mbtn-s" onclick="closeModal('scan-test-modal')">닫기</button>
-    </div>
-  </div>
-
   <!-- 방문자 등록 모달 (청년부) -->
   <div class="overlay" id="visitor-add-modal">
     <div class="modal" style="max-width:360px;width:88%;">
@@ -543,7 +515,7 @@ select, input, button { min-width: 0; box-sizing: border-box; }
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="main-rec-card">
     <div class="rec-hdr">
       <div><div class="lbl" style="margin:0">오늘 출석 현황 <span class="pending-badge" id="pending-badge"></span></div><div class="upd-time" id="upd-time"></div></div>
       <div style="display:flex;align-items:center;gap:6px">
@@ -561,6 +533,69 @@ select, input, button { min-width: 0; box-sizing: border-box; }
       <button id="rec-del-sel-btn" onclick="bulkDeleteRecords()" disabled style="background:var(--rd-fg);color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;opacity:.5;">선택 삭제 (0명)</button>
     </div>
     <div id="rec-list"><div class="empty-msg">📋 아직 출석 기록이 없어요</div></div>
+  </div>
+</div>
+
+<!-- ════════════ 청년부 역할 선택 화면 ════════════ -->
+<div id="s-youth-role" class="screen">
+  <div class="dept-wrap">
+    <div class="dept-top">
+      <div class="cross">🌟</div>
+      <h1>청년부 출석</h1>
+      <p>어떤 화면으로 들어갈까요?</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-top:10px;">
+      <button onclick="enterYouthAttend()" style="padding:24px;background:var(--pr);color:#fff;border:none;border-radius:16px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(125,60,152,.25);">
+        📱 출석하기
+        <div style="font-size:13px;font-weight:400;margin-top:6px;opacity:.9;">내 이름 선택 후 QR 띄우기</div>
+      </button>
+      <button onclick="enterScannerMode()" style="padding:24px;background:#fff;color:var(--pr-dk);border:2px solid var(--pr);border-radius:16px;font-size:18px;font-weight:700;cursor:pointer;">
+        📷 스캐너 화면
+        <div style="font-size:13px;font-weight:400;margin-top:6px;color:var(--muted);">리더기로 QR 태그 받기 (운영자용)</div>
+      </button>
+    </div>
+    <button class="dept-admin-link" onclick="goToDeptSelect()" style="margin-top:20px;">← 부서 선택으로</button>
+  </div>
+</div>
+
+<!-- ════════════ 청년부 스캐너 화면 (공용 기기) ════════════ -->
+<div id="s-scanner" class="screen">
+  <div class="adm-hdr" style="background:var(--pr);">
+    <button class="back-btn" onclick="showScreen('s-youth-role')">←</button>
+    <h2 style="flex:1;">📷 스캐너 출석</h2>
+    <button onclick="showDeptAdminPwFromScanner()" style="background:rgba(255,255,255,.2);border:none;color:#fff;font-size:18px;cursor:pointer;border-radius:50%;width:36px;height:36px;">⚙</button>
+  </div>
+
+  <div style="padding:16px;">
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 0;">
+        <span style="font-size:22px;">📡</span>
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--pr-dk);">스캔 대기 중</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">QR을 리더기로 태그하면 자동으로 출석됩니다.</div>
+        </div>
+      </div>
+      <button class="change-dept-btn" onclick="openVisitorAdd()" style="margin:8px 0 0;background:#e8f8f0;color:#1a7a41;border-color:#a9dfbf;">➕ 방문자 출석 등록</button>
+    </div>
+
+    <div class="card">
+      <div class="rec-hdr">
+        <div><div class="lbl" style="margin:0">오늘 출석 현황 <span class="pending-badge" id="scan-pending-badge"></span></div><div class="upd-time" id="scan-upd-time"></div></div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button onclick="refreshScannerRecords()" style="background:var(--pr-pl);color:var(--pr-dk);border:none;border-radius:20px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;">↻ 새로고침</button>
+          <div class="cnt-chip" id="scan-cnt-chip">0명</div>
+          <button id="scan-rec-edit-btn" onclick="toggleScanRecEdit()" style="background:#eef2f7;color:#1a5276;border:none;border-radius:20px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;">편집</button>
+        </div>
+      </div>
+      <div id="scan-rec-edit-bar" style="display:none;align-items:center;justify-content:space-between;background:#fdf2f2;border:1px solid #f5c6c6;border-radius:10px;padding:8px 12px;margin-bottom:10px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--txt);cursor:pointer;">
+          <input type="checkbox" id="scan-rec-select-all" onchange="toggleScanRecSelectAll(this)" style="width:18px;height:18px;accent-color:var(--rd-fg);"/>
+          <span>전체 선택</span>
+        </label>
+        <button id="scan-rec-del-sel-btn" onclick="bulkDeleteRecords()" disabled style="background:var(--rd-fg);color:#fff;border:none;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;opacity:.5;">선택 삭제 (0명)</button>
+      </div>
+      <div id="scan-rec-list"><div class="empty-msg">📋 아직 출석 기록이 없어요</div></div>
+    </div>
   </div>
 </div>
 
@@ -1168,37 +1203,12 @@ select, input, button { min-width: 0; box-sizing: border-box; }
     <button class="mbtn mbtn-s" onclick="closeModal('pw-modal')">취소</button>
   </div>
 </div>
-<!-- 공용 기기 스캔 대기 화면 (청년부) -->
-<div class="overlay" id="scan-mode-overlay" style="align-items:stretch;">
-  <div style="background:#fff;width:100%;max-width:520px;margin:auto;border-radius:20px;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:92vh;">
-    <div style="padding:16px 18px;background:var(--pr);color:#fff;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-      <div style="font-size:17px;font-weight:700;">📷 스캔 출석 대기 중</div>
-      <button onclick="closeScanMode()" style="background:rgba(255,255,255,.2);border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1;border-radius:50%;width:32px;height:32px;">×</button>
-    </div>
-    <div style="padding:18px;overflow-y:auto;">
-      <div style="text-align:center;margin-bottom:16px;">
-        <div style="font-size:14px;color:var(--muted);margin-bottom:10px;">리더기로 QR/바코드를 태그하세요</div>
-        <input id="scan-input" type="text" autocomplete="off" placeholder="여기에 자동 입력됩니다"
-          style="width:100%;padding:14px;font-size:16px;border:2px solid var(--pr);border-radius:12px;text-align:center;letter-spacing:1px;"
-          onkeydown="if(event.key==='Enter'){event.preventDefault();onScanSubmit();}"/>
-        <div style="font-size:11px;color:var(--muted);margin-top:6px;">입력창이 활성화되어 있어야 리더기가 작동합니다</div>
-      </div>
-      <div id="scan-result" style="min-height:40px;text-align:center;font-size:15px;font-weight:600;margin-bottom:14px;"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <div class="lbl" style="margin:0;">오늘 스캔 출석 <span id="scan-cnt" style="color:var(--pr);font-weight:700;"></span></div>
-      </div>
-      <div id="scan-list" style="max-height:38vh;overflow-y:auto;"></div>
-    </div>
-  </div>
-</div>
-
 <!-- 내 QR 출석 표시 모달 (청년부) -->
 <div class="overlay" id="my-qr-modal">
   <div class="modal" style="max-width:360px;width:88%;text-align:center;">
     <div style="font-size:18px;font-weight:700;color:var(--pr-dk);margin-bottom:4px;" id="my-qr-name"></div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">리더기에 아래 코드를 태그해주세요</div>
     <div id="my-qr-box" style="display:flex;justify-content:center;margin-bottom:14px;"></div>
-    <svg id="my-barcode" style="width:100%;max-width:280px;height:70px;margin-bottom:10px;"></svg>
     <div style="font-size:12px;color:var(--muted);letter-spacing:1px;margin-bottom:16px;" id="my-qr-uid"></div>
     <button class="mbtn mbtn-s" onclick="closeMyQr()">닫기</button>
   </div>
@@ -1566,16 +1576,21 @@ function selectDept(dept, showLoading=true){
   const clsSelEl = document.getElementById('cls-sel');
   if(clsSelEl) clsSelEl.style.display = useCls ? '' : 'none';
 
-  showScreen('s-main');
+  // 청년부는 역할 선택 화면을 먼저 띄움 (출석하기 / 스캐너)
+  if(dept.name === '청년부'){
+    showScreen('s-youth-role');
+  } else {
+    showScreen('s-main');
+  }
 
-  // 청년부: QR 출석 모드 (스캔 진입 버튼 표시, 출석 버튼 문구 변경)
+  // 청년부: QR 출석 모드 (출석 버튼 문구 변경, 출석현황 카드 숨김 → 스캐너 화면에서 봄)
   const isQrDept = (dept.name === '청년부');
-  const qrEntry = document.getElementById('qr-scan-entry');
-  if(qrEntry) qrEntry.style.display = isQrDept ? 'block' : 'none';
   const _sbIcon = document.querySelector('#sub-btn .sb-icon');
   if(_sbIcon) _sbIcon.textContent = isQrDept ? '📱' : '🙌';
   const _sbMain = document.getElementById('sub-btn-main');
   if(_sbMain) _sbMain.textContent = isQrDept ? '내 QR 출석하기' : '출석 확인하기';
+  const _mainRecCard = document.getElementById('main-rec-card');
+  if(_mainRecCard) _mainRecCard.style.display = isQrDept ? 'none' : '';
   // 청년부는 일괄 출석 버튼 숨김 (QR 스캔 방식이라 불필요)
   const _bulkToggle = document.getElementById('bulk-toggle-btn');
   if(_bulkToggle) _bulkToggle.style.display = isQrDept ? 'none' : '';
@@ -1943,12 +1958,6 @@ function showMyQr(student){
       } else { box.innerHTML = '<div style="color:#c0392b;font-size:13px;">QR 라이브러리 로드 실패</div>'; }
     }catch(e){ box.innerHTML = '<div style="color:#c0392b;font-size:13px;">QR 생성 실패</div>'; }
   }
-  // 바코드 생성 (CODE128 — 문자·숫자 혼합 지원)
-  const bc = document.getElementById('my-barcode');
-  if(bc && typeof JsBarcode !== 'undefined'){
-    try{ JsBarcode(bc, student.uid, { format:'CODE128', width:2, height:60, displayValue:false, margin:0 }); }
-    catch(e){ bc.style.display='none'; }
-  }
   openModal('my-qr-modal');
 }
 function closeMyQr(){
@@ -1957,8 +1966,6 @@ function closeMyQr(){
 }
 
 // ── ★ 공용 기기 스캔 출석 모드 ────────────────────────────────
-let _scanRecent = [];  // 이번 세션 스캔 목록 (표시용)
-
 // ── ★ 청년부 방문자 출석 등록 (바코드 없이) ──────────────────
 function openVisitorAdd(){
   document.getElementById('visitor-name').value = '';
@@ -1984,6 +1991,7 @@ function submitVisitor(){
   const rec = { name, grade:VISITOR_GRADE, gender, cls:'', status, time:timeStr, _pending:true };
   setCache([...cached, rec]);
   renderRecords(getCache(), true);
+  renderScannerRecords(getCache());  // 스캐너 화면 리스트 갱신
   _saveQueue.push({ name, grade:VISITOR_GRADE, gender, cls:'', status, retries:0 });
   _pendingCount++;
   updatePendingBadge();
@@ -1993,27 +2001,107 @@ function submitVisitor(){
   showToast(`방문자 ${name} 출석 등록 완료! 🙌`);
 }
 
-function openScanMode(){
-  document.getElementById('scan-mode-overlay').classList.add('show');
-  _scanRecent = [];
-  renderScanList();
-  document.getElementById('scan-result').innerHTML = '';
-  // 입력창 포커스 (리더기 입력 받도록)
-  setTimeout(()=>{ const i=document.getElementById('scan-input'); if(i){ i.value=''; i.focus(); } }, 200);
+// ── ★ 청년부 역할 선택 → 화면 진입 ──────────────────────────
+function enterYouthAttend(){
+  // 출석하기: 명단 선택 + QR (s-main), 출석현황 카드는 숨김
+  showScreen('s-main');
+  window.scrollTo(0,0);
+  const _mainRecCard = document.getElementById('main-rec-card');
+  if(_mainRecCard) _mainRecCard.style.display = 'none';
 }
-function closeScanMode(){
-  document.getElementById('scan-mode-overlay').classList.remove('show');
+function enterScannerMode(){
+  // 스캐너 화면: 방문자 등록 + 출석 기록
+  showScreen('s-scanner');
+  window.scrollTo(0,0);
+  refreshScannerRecords();
+  // 리더기 입력이 화면 전체 키 감지로 처리되므로 별도 포커스 불필요
 }
 
-// 리더기가 uid 입력 후 엔터 → 출석 처리
-function onScanSubmit(){
-  const input = document.getElementById('scan-input');
-  const uid = (input?.value || '').trim();
-  if(input) input.value = '';
-  if(input) input.focus();  // 다음 스캔 위해 포커스 유지
-  if(!uid) return;
-  processUidScan(uid, true);
+// 스캐너 화면 출석 기록 새로고침
+async function refreshScannerRecords(){
+  try{
+    const data = await api({action:'records'});
+    if(data.error) throw new Error(data.error);
+    setCache(data.records||[]);
+    renderScannerRecords(data.records||[]);
+  }catch(e){ showToast('오류: '+e.message); }
 }
+
+// 스캐너 화면 출석 기록 렌더 (s-main renderRecords와 별개로 스캐너 리스트에 표시)
+function renderScannerRecords(records){
+  records = records || getCache();
+  const el = document.getElementById('scan-rec-list');
+  const chip = document.getElementById('scan-cnt-chip');
+  if(chip) chip.textContent = `${records.length}명`;
+  const upd = document.getElementById('scan-upd-time');
+  if(upd){ const t=new Date(); upd.textContent = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')} 기준`; }
+  if(!el) return;
+  if(!records.length){ el.innerHTML='<div class="empty-msg">📋 아직 출석 기록이 없어요</div>'; updateScanRecDelBtn(); return; }
+  el.innerHTML = records.map(r=>{
+    let rightSide;
+    if(r._failed) rightSide = `<span class="badge bf">저장실패</span>`;
+    else if(r._pending) rightSide = `<span class="badge bpend">저장 중…</span>`;
+    else rightSide = `<span class="badge ${r.status==='출석'?'bp':'bl'}">${esc(r.status)}</span>`;
+    const metaTxt = (r.grade===VISITOR_GRADE) ? `➕ 방문자${r.gender?' · '+esc(r.gender):''}` : `${esc(r.grade)}`;
+    if(scanRecEditMode && !r._pending){
+      const key = r.name+'__'+r.grade;
+      const checked = selectedRecKeys.has(key);
+      return `<div class="rec-row rec-editable${checked?' rec-checked':''}" onclick="toggleScanRecSelect('${esc(key)}')">
+        <label class="rec-check-wrap"><input type="checkbox" ${checked?'checked':''} style="width:20px;height:20px;accent-color:var(--rd-fg);pointer-events:none;"/></label>
+        <div class="rec-info"><div class="r-name">${esc(r.name)}</div><div class="r-meta">${metaTxt}</div></div>
+        <div class="rec-right">${rightSide}</div>
+      </div>`;
+    }
+    return `<div class="rec-row${r._pending?' rec-pending':''}">
+      <div class="rec-info"><div class="r-name">${esc(r.name)}</div><div class="r-meta">${metaTxt}</div></div>
+      <div class="rec-right">${rightSide}</div>
+    </div>`;
+  }).join('');
+  updateScanRecDelBtn();
+}
+
+// 스캐너 화면 편집 모드
+let scanRecEditMode = false;
+function toggleScanRecEdit(){
+  scanRecEditMode = !scanRecEditMode;
+  selectedRecKeys.clear();
+  const bar = document.getElementById('scan-rec-edit-bar');
+  const btn = document.getElementById('scan-rec-edit-btn');
+  if(bar) bar.style.display = scanRecEditMode ? 'flex' : 'none';
+  if(btn){ btn.textContent = scanRecEditMode?'완료':'편집'; btn.style.background = scanRecEditMode?'#1a5276':'#eef2f7'; btn.style.color = scanRecEditMode?'#fff':'#1a5276'; }
+  const allCb = document.getElementById('scan-rec-select-all'); if(allCb) allCb.checked = false;
+  renderScannerRecords(getCache());
+}
+function toggleScanRecSelect(key){
+  if(selectedRecKeys.has(key)) selectedRecKeys.delete(key); else selectedRecKeys.add(key);
+  renderScannerRecords(getCache());
+  const saved = getCache().filter(r=>!r._pending);
+  const allCb = document.getElementById('scan-rec-select-all');
+  if(allCb) allCb.checked = saved.length>0 && selectedRecKeys.size===saved.length;
+}
+function toggleScanRecSelectAll(cb){
+  selectedRecKeys.clear();
+  if(cb.checked) getCache().filter(r=>!r._pending).forEach(r=>selectedRecKeys.add(r.name+'__'+r.grade));
+  renderScannerRecords(getCache());
+}
+function updateScanRecDelBtn(){
+  const btn = document.getElementById('scan-rec-del-sel-btn');
+  if(!btn) return;
+  const n = selectedRecKeys.size;
+  btn.disabled = n===0;
+  btn.style.opacity = n===0 ? '.5' : '1';
+  btn.textContent = `선택 삭제 (${n}명)`;
+}
+
+// 스캐너 화면에서 관리자 진입 (비밀번호 확인)
+function showDeptAdminPwFromScanner(){
+  _adminFromScanner = true;
+  document.getElementById('pw-inp').value='';
+  document.getElementById('pw-err').textContent='';
+  openModal('pw-modal');
+  setTimeout(()=>document.getElementById('pw-inp').focus(),300);
+}
+let _adminFromScanner = false;
 
 // uid로 출석 처리 (스캔 모드/전역 감지 공통). showInScan=스캔화면 결과표시 여부
 // 한글 IME로 바뀐 입력을 영문 키로 되돌림 (리더기가 한글 상태에서 영문 QR을 칠 때 대비)
@@ -2076,19 +2164,16 @@ function processUidScan(uid, showInScan){
   uid = String(uid).trim();
   if(!uid) return;
   const found = findStudentByScan(uid);
-  const resultEl = document.getElementById('scan-result');
 
   if(!found){
-    if(showInScan && resultEl) resultEl.innerHTML = `<span style="color:var(--rd-fg);">❌ 등록되지 않은 코드입니다</span>`;
-    else showToast('❌ 등록되지 않은 코드입니다');
+    showToast('❌ 등록되지 않은 코드입니다');
     return;
   }
 
   // 이미 출석했는지 확인
   const cached = getCache();
   if(cached.some(r=>r.name===found.name && r.grade===found.grade)){
-    if(showInScan && resultEl) resultEl.innerHTML = `<span style="color:var(--or-fg);">⚠️ ${esc(found.name)} — 이미 출석했습니다</span>`;
-    else showToast(`⚠️ ${found.name} — 이미 출석했습니다`);
+    showToast(`⚠️ ${found.name} — 이미 출석했습니다`);
     return;
   }
 
@@ -2100,57 +2185,12 @@ function processUidScan(uid, showInScan){
   const rec = { name:found.name, grade:found.grade||'', gender:found.gender||'', cls:found.cls||'', status, time:timeStr, _pending:true };
   setCache([...cached, rec]);
   renderRecords(getCache(), true);
+  renderScannerRecords(getCache());  // 스캐너 화면 리스트 갱신
   _saveQueue.push({ name:found.name, grade:found.grade||'', gender:found.gender||'', cls:found.cls||'', status, retries:0 });
   _pendingCount++;
   updatePendingBadge();
   runSaveQueue();
-
-  // 결과 표시
-  if(showInScan && resultEl){
-    resultEl.innerHTML = `<span style="color:var(--gr-fg);">✅ ${esc(found.name)} 출석 완료!</span>`;
-    _scanRecent.unshift({ name:found.name, time:timeStr, status });
-    renderScanList();
-  } else {
-    showToast(`✅ ${found.name} 출석 완료! 🙌`);
-  }
-}
-
-// ── ★ 스캔 테스트 (리더기 없이 확인) ──────────────────────────
-function openScanTest(){
-  document.getElementById('scan-test-input').value = '';
-  openModal('scan-test-modal');
-  setTimeout(()=>document.getElementById('scan-test-input')?.focus(), 200);
-}
-function runScanTest(){
-  const uid = (document.getElementById('scan-test-input')?.value || '').trim();
-  if(!uid){ showToast('고유코드를 입력해주세요'); return; }
-  closeModal('scan-test-modal');
-  // 실제 리더기 스캔과 100% 동일한 경로로 처리
-  processUidScan(uid, false);
-}
-
-// 리더기 스캔을 실제로 재현 — 빠른 키다운 이벤트 + 엔터를 발생시켜 전역 리스너 경로 통과
-function simulateReaderScan(){
-  const uid = (document.getElementById('scan-test-input')?.value || '').trim();
-  if(!uid){ showToast('고유코드를 입력해주세요'); return; }
-  // 모달을 먼저 닫고 (리더기 스캔은 메인 화면에서 일어나므로), 포커스도 해제
-  closeModal('scan-test-modal');
-  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
-  showToast('📡 리더기 스캔 재현 중...');
-  // 약간의 지연 후 리더기처럼 빠르게 키 입력 (모달 닫힘 반영 대기)
-  setTimeout(()=>{
-    const chars = uid.split('');
-    // 각 문자를 10ms 간격으로 빠르게 (리더기 속도) → keydown 이벤트 발생
-    chars.forEach((ch, i)=>{
-      setTimeout(()=>{
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true }));
-      }, i * 10);
-    });
-    // 마지막에 엔터
-    setTimeout(()=>{
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    }, chars.length * 10 + 10);
-  }, 300);
+  showToast(`✅ ${found.name} 출석 완료! 🙌`);
 }
 
 // ── ★ 전역 스캔 감지 (버튼 없이 스캔만으로 출석) ──────────────
@@ -2164,11 +2204,11 @@ function initGlobalScanListener(){
     if(document.hidden) return;
     // ② 현재 부서가 청년부일 때만
     if(!useQrAttend()) return;
-    // ③ 청년부 출석 메인 화면(s-main)이 실제로 활성 상태일 때만
-    const mainScreen = document.getElementById('s-main');
-    if(!mainScreen || !mainScreen.classList.contains('active')) return;
-    // ④ 다른 화면(관리자/보고서/통계 등)이 하나라도 활성이면 차단 (이중 안전장치)
-    const otherActive = ['s-dept','s-admin','s-report','s-stats','s-teacher','s-parent']
+    // ③ 스캐너 화면(s-scanner)이 실제로 활성 상태일 때만
+    const scanScreen = document.getElementById('s-scanner');
+    if(!scanScreen || !scanScreen.classList.contains('active')) return;
+    // ④ 다른 화면이 하나라도 활성이면 차단 (이중 안전장치)
+    const otherActive = ['s-dept','s-main','s-youth-role','s-admin','s-report','s-stats','s-teacher','s-parent']
       .some(id=>document.getElementById(id)?.classList.contains('active'));
     if(otherActive) return;
     // ⑤ 열려있는 모달/오버레이가 있으면 차단 (QR표시·방문자·테스트·성경선택 등)
@@ -2202,19 +2242,6 @@ function initGlobalScanListener(){
   });
 }
 
-
-function renderScanList(){
-  const el = document.getElementById('scan-list');
-  const cnt = document.getElementById('scan-cnt');
-  if(cnt) cnt.textContent = _scanRecent.length ? `(${_scanRecent.length}명)` : '';
-  if(!el) return;
-  if(!_scanRecent.length){ el.innerHTML = '<div class="empty-msg" style="padding:16px;font-size:13px;">아직 스캔된 인원이 없습니다</div>'; return; }
-  el.innerHTML = _scanRecent.map(r=>`
-    <div class="rec-row">
-      <div class="rec-info"><div class="r-name">${esc(r.name)}</div><div class="r-meta">${esc(r.time)}</div></div>
-      <span class="badge ${r.status==='출석'?'bp':'bl'}">${esc(r.status)}</span>
-    </div>`).join('');
-}
 
 function doSubmit(){
   const rawVal = document.getElementById('name-sel').value;
@@ -2516,6 +2543,7 @@ function syncServerRecords(serverRecords){
   });
   setCache(merged);
   renderRecords(merged, true);
+  renderScannerRecords(merged);  // 스캐너 화면 리스트도 갱신 (저장 완료 반영)
   // 일괄 출석 패널이 열려있으면 출석완료 표시 갱신
   if(bulkMode) renderBulkList();
 }
@@ -3249,7 +3277,16 @@ function goAdmin(){
     }
   }
 }
-function goMain(){ showScreen('s-main'); window.scrollTo(0,0); }
+function goMain(){
+  // 스캐너에서 관리자로 들어왔으면 스캐너로 복귀
+  if(_adminFromScanner){
+    _adminFromScanner = false;
+    showScreen('s-scanner'); window.scrollTo(0,0);
+    refreshScannerRecords();
+    return;
+  }
+  showScreen('s-main'); window.scrollTo(0,0);
+}
 
 // ══════════════════════════════════════════════════════════════
 // ★ 드럼 피커 엔진 (iOS 휠 스타일)
