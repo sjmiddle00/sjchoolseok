@@ -1619,8 +1619,8 @@ function selectDept(dept, showLoading=true){
 async function bootApp(showLoad=true){
   if (showLoad) setLoading(true,'앱 설정 불러오는 중...');
   try{
-    await fetchSettings();
-    await Promise.all([fetchStudents(), fetchRecords()]);
+    // 3개 요청을 모두 병렬로 (기존엔 settings가 순차라 느렸음)
+    await Promise.all([fetchSettings(), fetchStudents(), fetchRecords()]);
     startTimers();
   }catch(e){ showToast('연결 실패: '+e.message, 4000); }
   finally{ setLoading(false); }
@@ -2010,11 +2010,10 @@ function enterYouthAttend(){
   if(_mainRecCard) _mainRecCard.style.display = 'none';
 }
 function enterScannerMode(){
-  // 스캐너 화면: 방문자 등록 + 출석 기록
+  // 스캐너 화면: 방문자 등록 + 출석 기록 (캐시된 데이터로 즉시 표시, 재요청 안 함)
   showScreen('s-scanner');
   window.scrollTo(0,0);
-  refreshScannerRecords();
-  // 리더기 입력이 화면 전체 키 감지로 처리되므로 별도 포커스 불필요
+  renderScannerRecords(getCache());  // 이미 bootApp이 불러온 캐시 사용
 }
 
 // 스캐너 화면 출석 기록 새로고침
