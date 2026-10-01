@@ -1954,7 +1954,7 @@ function showMyQr(student){
     box.innerHTML = '';
     try{
       if(typeof QRCode !== 'undefined'){
-        new QRCode(box, { text: student.uid, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
+        new QRCode(box, { text: student.uid, width: 140, height: 140, correctLevel: QRCode.CorrectLevel.M });
       } else { box.innerHTML = '<div style="color:#c0392b;font-size:13px;">QR 라이브러리 로드 실패</div>'; }
     }catch(e){ box.innerHTML = '<div style="color:#c0392b;font-size:13px;">QR 생성 실패</div>'; }
   }
@@ -2165,7 +2165,8 @@ function processUidScan(uid, showInScan){
   const found = findStudentByScan(uid);
 
   if(!found){
-    showToast('❌ 등록되지 않은 코드입니다');
+    // 진단: 실제 스캔된 값과 변환값, 등록 인원수 표시
+    showToast(`❌ 미등록 | 입력:"${uid}" → 변환:"${koToEn(uid)}" | 명단 ${students.length}명`, 6000);
     return;
   }
 
